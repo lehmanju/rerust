@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 
 struct Inner<A>
 where
-    A: Copy + PartialEq,
+    A: Clone + PartialEq,
 {
     waker: AtomicWaker,
     value: RwLock<Option<A>>,
@@ -16,9 +16,9 @@ where
 #[derive(Clone)]
 pub struct Var<A>(Arc<Inner<A>>)
 where
-    A: Copy + PartialEq;
+    A: Clone + PartialEq;
 
-impl<A: Copy + PartialEq> Var<A> {
+impl<A: Clone + PartialEq> Var<A> {
     pub fn new(value: A) -> Var<A> {
         Var(Arc::new(Inner {
             waker: AtomicWaker::new(),
@@ -27,14 +27,15 @@ impl<A: Copy + PartialEq> Var<A> {
     }
 
     pub fn set(&self, value: A) {
-        if *self.0.value.read().unwrap() != Some(value) {
-            *self.0.value.write().unwrap() = Some(value);
+        let v = Some(value);
+        if *self.0.value.read().unwrap() != v {
+            *self.0.value.write().unwrap() = v;
             self.0.waker.wake();
         }
     }
 }
 
-impl<A: Copy + PartialEq> Signal for Var<A> {
+impl<A: Clone + PartialEq> Signal for Var<A> {
     type Item = A;
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         self.0.waker.register(cx.waker());
