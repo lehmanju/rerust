@@ -11,7 +11,7 @@ where
     A: Copy + PartialEq,
 {
     waker: AtomicWaker,
-    value: RwLock<A>,
+    value: RwLock<Option<A>>,
 }
 #[derive(Clone)]
 pub struct Var<A>(Arc<Inner<A>>)
@@ -22,13 +22,13 @@ impl<A: Copy + PartialEq> Var<A> {
     pub fn new(value: A) -> Var<A> {
         Var(Arc::new(Inner {
             waker: AtomicWaker::new(),
-            value: RwLock::new(value),
+            value: RwLock::new(Some(value)),
         }))
     }
 
     pub fn set(&self, value: A) {
-        if *self.0.value.read().unwrap() != value {
-            *self.0.value.write().unwrap() = value;
+        if *self.0.value.read().unwrap() != Some(value) {
+            *self.0.value.write().unwrap() = Some(value);
             self.0.waker.wake();
         }
     }
@@ -39,6 +39,9 @@ impl<A: Copy + PartialEq> Signal for Var<A> {
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         self.0.waker.register(cx.waker());
         let val = self.0.value.read().unwrap().clone();
-        Poll::Ready(Some(val))
+        match val {
+            Some(v) => Poll::Ready(Some(v)),
+            None => Poll::Pending,
+        }
     }
 }
