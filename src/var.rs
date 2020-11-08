@@ -1,57 +1,35 @@
-use std;
-use std::fmt;
-use std::marker::Unpin;
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
-// TODO use parking_lot ?
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
-// TODO use parking_lot ?
 use crate::signal::Signal;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::task::{Context, Poll, Waker};
+use futures::task::AtomicWaker;
+use std;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::task::{Context, Poll};
 
-struct VarState<A> {
-    value: RwLock<
-}
-
-pub struct Var<A>
+struct Inner<A>
 where
     A: Copy + PartialEq,
 {
-    value: A,
-    
+    waker: AtomicWaker,
+    value: RwLock<A>,
 }
-
-pub struct VarSignal<A>
-where A : Copy + PartialEq
-{
-    receivers: Vec<Weak<VarReceiver>>,
-}
-
-pub struct VarReceiver {
-    waker: Mutex<Option<Waker>>,
-}
+#[derive(Clone)]
+pub struct Var<A>(Arc<Inner<A>>)
+where
+    A: Copy + PartialEq;
 
 impl<A: Copy + PartialEq> Var<A> {
     pub fn new(value: A) -> Var<A> {
-        todo!()
+        Var(Arc::new(Inner {
+            waker: AtomicWaker::new(),
+            value: RwLock::new(value),
+        }))
     }
 
-    pub fn set(&mut self, value: A) {
-        if value != self.value {
-            self.value = value;
-            self.receivers.retain(|receiver| {
-                if let Some(receiver) = receiver.upgrade() {
-                    let mut lock = receiver.waker.lock().unwrap();
-                    if let Some(waker) = lock.take() {
-                        drop(lock);
-                        waker.wake();
-                    }
-                    true
-                } else {
-                    false
-                }
-            })
+    pub fn set(&self, value: A) {
+        if *self.0.value.read().unwrap() != value {
+            *self.0.value.write().unwrap() = value;
+            self.0.waker.wake();
         }
     }
 }
@@ -59,6 +37,8 @@ impl<A: Copy + PartialEq> Var<A> {
 impl<A: Copy + PartialEq> Signal for Var<A> {
     type Item = A;
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        todo!()
+        self.0.waker.register(cx.waker());
+        let val = self.0.value.read().unwrap().clone();
+        Poll::Ready(Some(val))
     }
 }
