@@ -42,7 +42,7 @@ impl<A: Clone + PartialEq> Var<A> {
 
 impl<A: Clone + PartialEq> Signal for Var<A> {
     type Item = A;
-    fn poll_change(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Option<Self::Item>> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item> {
         self.0.waker.register(cx.waker());
         let existing = self
             .0
@@ -50,10 +50,11 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
             .read()
             .unwrap()
             .iter()
-            .find(|(id, _)| *id == uuid).map(|(_,val)| (*val).clone());
+            .find(|(id, _)| *id == uuid)
+            .map(|(_, val)| (*val).clone());
         let val = existing.or(self.0.value.read().unwrap().clone());
         match val {
-            Some(v) => Poll::Ready(Some(v)),
+            Some(v) => Poll::Ready(v),
             None => Poll::Pending,
         }
     }
