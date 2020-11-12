@@ -1,11 +1,14 @@
 pub mod var;
 
 mod signal {
+    use futures::Future;
     use pin_project::pin_project;
     use std::{
         pin::Pin,
+        sync::atomic::AtomicBool,
         task::{Context, Poll},
     };
+    use uuid::Uuid;
 
     /// Signal trait modeling a changing value over time
     ///
@@ -114,6 +117,45 @@ mod signal {
 
             this.signal_a.as_mut().transaction_end(uuid);
             this.signal_b.as_mut().transaction_end(uuid);
+        }
+    }
+
+    #[pin_project]
+    pub struct FutureWrapper<A, B>
+    where
+        A: Signal,
+    {
+        #[pin]
+        signal: A,
+        old: Option<A::Item>,
+        f: B,
+    }
+
+    impl<A, B> Future for FutureWrapper<A, B>
+    where
+        A: Signal,
+        B: FnMut(A::Item),
+        A::Item: Clone + PartialEq,
+    {
+        type Output = A::Item;
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let mut this = self.project();
+            let uuid = Uuid::new_v4().as_u128() as u32;
+            let mut result = Poll::Pending;
+
+            if let Poll::Ready(v) = this.signal.as_mut().poll(cx, uuid) {
+                if let Some(o) = this.old.as_mut() {
+                    if *o != v {
+                        result = Poll::Ready(v.clone());
+                        *o = v;
+                    }
+                } else {
+                    result = Poll::Ready(v.clone());
+                    this.old.replace(v);
+                }
+            }
+            this.signal.as_mut().transaction_end(uuid);
+            return result;
         }
     }
 }
