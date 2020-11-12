@@ -5,7 +5,6 @@ mod signal {
     use pin_project::pin_project;
     use std::{
         pin::Pin,
-        sync::atomic::AtomicBool,
         task::{Context, Poll},
     };
     use uuid::Uuid;
@@ -17,17 +16,20 @@ mod signal {
     pub trait Signal {
         type Item;
 
-        /// Poll the underlying future
+        /// Poll the signal
         ///
         /// # Return value:
         ///
-        /// - `Poll::Pending` indicates that the Signal has not changed
+        /// - `Poll::Pending` indicates that the Signal value is not yet ready
         ///
-        /// - `Poll::Ready(Some(val))` is returend if there is a change detected and the Signal has to be reevaluated.
+        /// - `Poll::Ready(val)` is returend if the value is ready
         ///
-        /// Unlike Stream a Signal nevert terminates, so there is **no** `Poll::Ready(None)`.
+        /// `uuid` corresponds to the current transaction running. If a Signal is evaluated more than once it will encounter the same `uuid`. This indicates that it is evaluated in the same transaction meaning it should return the same value.
         fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item>;
 
+        /// Indicate that a transaction has ended.
+        ///
+        /// Release all objects that are no longer needed.
         fn transaction_end(self: Pin<&mut Self>, uuid: u32);
     }
 
@@ -80,8 +82,9 @@ mod signal {
         }
     }
 
-    // copy SignalExt
-
+    /// A combination of two Signals.
+    ///
+    /// It will poll both Signals and generate a new Signal by applying the internal callback.
     #[pin_project]
     pub struct CombinedMap<A, B, C> {
         #[pin]
@@ -120,6 +123,9 @@ mod signal {
         }
     }
 
+    /// Wraps a Signal in a Future.
+    ///
+    /// This is essentially the standard way of interacting with Signal values. The provided closure will be called on each Signal change. Reevaluation will only occur then.
     #[pin_project]
     pub struct FutureWrapper<A, B>
     where
