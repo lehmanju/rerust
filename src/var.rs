@@ -44,6 +44,7 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
     type Item = A;
     fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item> {
         self.0.waker.register(cx.waker());
+        // lookup transaction list for previous evaluation
         let existing = self
             .0
             .transactions
@@ -52,6 +53,7 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
             .iter()
             .find(|(id, _)| *id == uuid)
             .map(|(_, val)| (*val).clone());
+        // use cached value or else current value
         let val = existing.or(self.0.value.read().unwrap().clone());
         match val {
             Some(v) => Poll::Ready(v),
@@ -59,6 +61,7 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
         }
     }
     fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
+        // delete transaction with given uuid
         self.0
             .transactions
             .write()
