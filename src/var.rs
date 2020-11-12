@@ -12,17 +12,22 @@ where
 {
     waker: AtomicWaker,
     value: RwLock<Option<A>>,
+    transactions: RwLock<Vec<(u32, A)>>,
 }
 #[derive(Clone)]
 pub struct Var<A>(Arc<Inner<A>>)
 where
     A: Clone + PartialEq;
 
+unsafe impl<A> Send for Var<A> where A: Clone + PartialEq {}
+unsafe impl<A> Sync for Var<A> where A: Clone + PartialEq {}
+
 impl<A: Clone + PartialEq> Var<A> {
     pub fn new(value: A) -> Var<A> {
         Var(Arc::new(Inner {
             waker: AtomicWaker::new(),
             value: RwLock::new(Some(value)),
+            transactions: RwLock::new(Vec::new()),
         }))
     }
 
@@ -37,12 +42,26 @@ impl<A: Clone + PartialEq> Var<A> {
 
 impl<A: Clone + PartialEq> Signal for Var<A> {
     type Item = A;
-    fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+    fn poll_change(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Option<Self::Item>> {
         self.0.waker.register(cx.waker());
+        let existing = self
+            .0
+            .transactions
+            .read()
+            .unwrap()
+            .iter()
+            .find(|(id, val)| *id == uuid);
         let val = self.0.value.read().unwrap().clone();
         match val {
             Some(v) => Poll::Ready(Some(v)),
             None => Poll::Pending,
         }
+    }
+    fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
+        self.0
+            .transactions
+            .write()
+            .unwrap()
+            .retain(|(u, v)| *u != uuid);
     }
 }
