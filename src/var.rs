@@ -50,8 +50,8 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
             .read()
             .unwrap()
             .iter()
-            .find(|(id, val)| *id == uuid);
-        let val = self.0.value.read().unwrap().clone();
+            .find(|(id, _)| *id == uuid).map(|(_,val)| (*val).clone());
+        let val = existing.or(self.0.value.read().unwrap().clone());
         match val {
             Some(v) => Poll::Ready(Some(v)),
             None => Poll::Pending,
@@ -62,6 +62,6 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
             .transactions
             .write()
             .unwrap()
-            .retain(|(u, v)| *u != uuid);
+            .retain(|(u, _)| *u != uuid);
     }
 }
