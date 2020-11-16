@@ -1,7 +1,7 @@
 pub mod var;
 
 mod signal {
-    use futures::Future;
+    use futures::{Future, Stream};
     use pin_project::pin_project;
     use std::{
         pin::Pin,
@@ -88,10 +88,10 @@ mod signal {
     #[pin_project]
     pub struct CombinedMap<A, B, C> {
         #[pin]
-        signal_a: A,
+        pub(crate) signal_a: A,
         #[pin]
-        signal_b: B,
-        callback: C,
+        pub(crate) signal_b: B,
+        pub(crate) callback: C,
     }
 
     impl<A, B, C, I> Signal for CombinedMap<A, B, C>
@@ -132,9 +132,9 @@ mod signal {
         A: Signal,
     {
         #[pin]
-        signal: A,
-        old: Option<A::Item>,
-        f: B,
+        pub(crate) signal: A,
+        pub(crate) old: Option<A::Item>,
+        pub(crate) f: B,
     }
 
     impl<A, B> Future for FutureWrapper<A, B>
@@ -164,4 +164,44 @@ mod signal {
             return result;
         }
     }
+
+    #[pin_project]
+    pub struct Constant<A>
+    where
+        A: Future,
+    {
+        #[pin]
+        pub(crate) future: A,
+        pub(crate) value: Option<A::Output>,
+    }
+
+    impl<A: Future> Signal for Constant<A>
+    where
+        A::Output: Clone + PartialEq,
+    {
+        type Item = A::Output;
+        fn poll(self: Pin<&mut Self>, cx: &mut Context, _: u32) -> Poll<Self::Item> {
+            let mut this = self.project();
+            match this.value {
+                Some(v) => Poll::Ready(v.clone()),
+                None => {
+                    let fut_poll = this.future.as_mut().poll(cx);
+                    match fut_poll {
+                        Poll::Ready(value) => {
+                            this.value.as_mut().replace(&mut value.clone());
+                            Poll::Ready(value)
+                        }
+                        Poll::Pending => Poll::Pending,
+                    }
+                }
+            }
+        }
+        fn transaction_end(self: Pin<&mut Self>, _: u32) {
+            // nothing to do
+        }
+    }
+
+    pub trait Convert {}
+
+    impl<T, A> Convert for T where T: Future<Output = A> {}
 }

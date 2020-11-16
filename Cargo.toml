@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 futures-signals = "0.3"
-futures = "0.3"
+futures = { version = "0.3", features = ["thread-pool"] }
 pin-project = "1.0"
 carboxyl = "0.2"
-uuid = { version= "0.8" , features = ["v4"]}
+uuid = { version = "0.8" , features = ["v4"] }
