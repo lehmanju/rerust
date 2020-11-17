@@ -9,12 +9,6 @@ mod signal {
     };
     use uuid::Uuid;
 
-    #[derive(Clone, Copy)]
-    pub enum Transaction {
-        None,
-        Id(u32),
-    }
-
     /// Signal trait modeling a changing value over time
     ///
     /// This can be seen as a Stream of values that never ends.
@@ -31,14 +25,14 @@ mod signal {
         /// - `Poll::Ready(val)` is returend if the value is ready
         ///
         /// `uuid` corresponds to the current transaction running. If a Signal is evaluated more than once it will encounter the same `uuid`. This indicates that it is evaluated in the same transaction meaning it should return the same value.
-        /// uuid = 0 is reserved and should be used for transactions that do not care about consistency.
-        // TODO use enum for uuid, None/Transaction(uuid)
-        fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: Transaction) -> Self::Item;
+        fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Self::Item;
 
         /// Indicate that a transaction has ended.
         ///
         /// Release all objects that are no longer needed.
-        fn transaction_end(self: Pin<&mut Self>, uuid: Transaction);
+        fn transaction_end(self: Pin<&mut Self>, uuid: u32);
+
+        fn value(&self) -> Self::Item;
     }
 
     /// A combination of two Signals.
@@ -60,7 +54,7 @@ mod signal {
         C: Fn(A::Item, B::Item) -> I + 'static,
     {
         type Item = I;
-        fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: Transaction) -> Self::Item {
+        fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Self::Item {
             let mut this = self.project();
 
             let a = this.signal_a.as_mut().poll(cx, uuid);
@@ -68,11 +62,16 @@ mod signal {
 
             (this.callback)(a, b)
         }
-        fn transaction_end(self: Pin<&mut Self>, uuid: Transaction) {
+        fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
             let mut this = self.project();
 
             this.signal_a.as_mut().transaction_end(uuid);
             this.signal_b.as_mut().transaction_end(uuid);
+        }
+        fn value(&self) -> Self::Item {
+            let a = self.signal_a.value();
+            let b = self.signal_b.value();
+            (self.callback)(a, b)
         }
     }
 
@@ -99,7 +98,7 @@ mod signal {
         type Output = A::Item;
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let mut this = self.project();
-            let uuid = Transaction::Id(Uuid::new_v4().as_u128() as u32);
+            let uuid = Uuid::new_v4().as_u128() as u32;
             let v = this.signal.as_mut().poll(cx, uuid);
 
             match this.old.as_mut() {
@@ -134,7 +133,7 @@ mod signal {
         A::Output: Clone + PartialEq,
     {
         type Item = A::Output;
-        fn poll(self: Pin<&mut Self>, cx: &mut Context, _: Transaction) -> Self::Item {
+        fn poll(self: Pin<&mut Self>, cx: &mut Context, _: u32) -> Self::Item {
             let mut this = self.project();
 
             let fut_poll = this.future.as_mut().poll(cx);
@@ -146,29 +145,13 @@ mod signal {
                 Poll::Pending => this.value.clone(),
             }
         }
-        fn transaction_end(self: Pin<&mut Self>, _: Transaction) {
+        fn transaction_end(self: Pin<&mut Self>, _: u32) {
             // nothing to do
         }
-    }
-
-    #[pin_project]
-    pub struct SignalValue<A> {
-        #[pin]
-        signal: A,
-    }
-
-    impl<A> Future for SignalValue<A>
-    where
-        A: Signal,
-        A::Item: Clone + PartialEq,
-    {
-        type Output = A::Item;
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let mut this = self.project();
-            Poll::Ready(this.signal.as_mut().poll(cx, Transaction::None))
+        fn value(&self) -> Self::Item {
+            self.value.clone()
         }
     }
-
     // from future to signal
     pub trait Convert {}
 

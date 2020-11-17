@@ -1,4 +1,4 @@
-use crate::signal::{Signal, Transaction};
+use crate::signal::Signal;
 use futures::task::AtomicWaker;
 use std;
 use std::pin::Pin;
@@ -41,33 +41,29 @@ impl<A: Clone + PartialEq> Var<A> {
 
 impl<A: Clone + PartialEq> Signal for Var<A> {
     type Item = A;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: Transaction) -> Self::Item {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Self::Item {
         self.0.waker.register(cx.waker());
-        match uuid {
-            Transaction::None => self.0.value.read().unwrap().clone(),
-            Transaction::Id(uid) => {
-                // lookup transaction list for previous evaluation
-                let existing = self
-                    .0
-                    .transactions
-                    .read()
-                    .unwrap()
-                    .iter()
-                    .find(|(id, _)| *id == uid)
-                    .map(|(_, val)| (*val).clone());
-                // use cached value or else current value
-                existing.unwrap_or(self.0.value.read().unwrap().clone())
-            }
-        }
+        // lookup transaction list for previous evaluation
+        let existing = self
+            .0
+            .transactions
+            .read()
+            .unwrap()
+            .iter()
+            .find(|(id, _)| *id == uuid)
+            .map(|(_, val)| (*val).clone());
+        // use cached value or else current value
+        existing.unwrap_or(self.0.value.read().unwrap().clone())
     }
-    fn transaction_end(self: Pin<&mut Self>, uuid: Transaction) {
-        if let Transaction::Id(id) = uuid {
-            // delete transaction with given uuid
-            self.0
-                .transactions
-                .write()
-                .unwrap()
-                .retain(|(u, _)| *u != id);
-        }
+    fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
+        // delete transaction with given uuid
+        self.0
+            .transactions
+            .write()
+            .unwrap()
+            .retain(|(u, _)| *u != uuid);
+    }
+    fn value(&self) -> Self::Item {
+        self.0.value.read().unwrap().clone()
     }
 }
