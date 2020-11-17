@@ -1,4 +1,4 @@
-use crate::signal::Signal;
+use crate::signal::{Signal, Transaction};
 use futures::task::AtomicWaker;
 use std;
 use std::pin::Pin;
@@ -11,7 +11,7 @@ where
     A: Clone + PartialEq,
 {
     waker: AtomicWaker,
-    value: RwLock<Option<A>>,
+    value: RwLock<A>,
     transactions: RwLock<Vec<(u32, A)>>,
 }
 #[derive(Clone)]
@@ -26,15 +26,14 @@ impl<A: Clone + PartialEq> Var<A> {
     pub fn new(value: A) -> Var<A> {
         Var(Arc::new(Inner {
             waker: AtomicWaker::new(),
-            value: RwLock::new(Some(value)),
+            value: RwLock::new(value),
             transactions: RwLock::new(Vec::new()),
         }))
     }
 
     pub fn set(&self, value: A) {
-        let v = Some(value);
-        if *self.0.value.read().unwrap() != v {
-            *self.0.value.write().unwrap() = v;
+        if *self.0.value.read().unwrap() != value {
+            *self.0.value.write().unwrap() = value;
             self.0.waker.wake();
         }
     }
@@ -42,34 +41,33 @@ impl<A: Clone + PartialEq> Var<A> {
 
 impl<A: Clone + PartialEq> Signal for Var<A> {
     type Item = A;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: Transaction) -> Self::Item {
         self.0.waker.register(cx.waker());
-        let val = if uuid != 0 {
-            // lookup transaction list for previous evaluation
-            let existing = self
-                .0
-                .transactions
-                .read()
-                .unwrap()
-                .iter()
-                .find(|(id, _)| *id == uuid)
-                .map(|(_, val)| (*val).clone());
-            // use cached value or else current value
-            existing.or(self.0.value.read().unwrap().clone())
-        } else {
-            self.0.value.read().unwrap().clone()
-        };
-        match val {
-            Some(v) => Poll::Ready(v),
-            None => Poll::Pending,
+        match uuid {
+            Transaction::None => self.0.value.read().unwrap().clone(),
+            Transaction::Id(uid) => {
+                // lookup transaction list for previous evaluation
+                let existing = self
+                    .0
+                    .transactions
+                    .read()
+                    .unwrap()
+                    .iter()
+                    .find(|(id, _)| *id == uid)
+                    .map(|(_, val)| (*val).clone());
+                // use cached value or else current value
+                existing.unwrap_or(self.0.value.read().unwrap().clone())
+            }
         }
     }
-    fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
-        // delete transaction with given uuid
-        self.0
-            .transactions
-            .write()
-            .unwrap()
-            .retain(|(u, _)| *u != uuid);
+    fn transaction_end(self: Pin<&mut Self>, uuid: Transaction) {
+        if let Transaction::Id(id) = uuid {
+            // delete transaction with given uuid
+            self.0
+                .transactions
+                .write()
+                .unwrap()
+                .retain(|(u, _)| *u != id);
+        }
     }
 }
