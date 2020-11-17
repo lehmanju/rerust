@@ -25,61 +25,14 @@ mod signal {
         /// - `Poll::Ready(val)` is returend if the value is ready
         ///
         /// `uuid` corresponds to the current transaction running. If a Signal is evaluated more than once it will encounter the same `uuid`. This indicates that it is evaluated in the same transaction meaning it should return the same value.
+        /// uuid = 0 is reserved and should be used for transactions that do not care about consistency.
+        // TODO use enum for uuid, None/Transaction(uuid)
         fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item>;
 
         /// Indicate that a transaction has ended.
         ///
         /// Release all objects that are no longer needed.
         fn transaction_end(self: Pin<&mut Self>, uuid: u32);
-    }
-
-    // Copied from Future in the Rust stdlib
-    impl<'a, A> Signal for &'a mut A
-    where
-        A: ?Sized + Signal + Unpin,
-    {
-        type Item = A::Item;
-
-        #[inline]
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item> {
-            A::poll(Pin::new(&mut **self), cx, uuid)
-        }
-        fn transaction_end(mut self: Pin<&mut Self>, uuid: u32) {
-            A::transaction_end(Pin::new(&mut **self), uuid);
-        }
-    }
-
-    // Copied from Future in the Rust stdlib
-    impl<A> Signal for Box<A>
-    where
-        A: ?Sized + Signal + Unpin,
-    {
-        type Item = A::Item;
-
-        #[inline]
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item> {
-            A::poll(Pin::new(&mut *self), cx, uuid)
-        }
-        fn transaction_end(mut self: Pin<&mut Self>, uuid: u32) {
-            A::transaction_end(Pin::new(&mut *self), uuid);
-        }
-    }
-
-    // Copied from Future in the Rust stdlib
-    impl<A> Signal for Pin<A>
-    where
-        A: Unpin + ::std::ops::DerefMut,
-        A::Target: Signal,
-    {
-        type Item = <<A as ::std::ops::Deref>::Target as Signal>::Item;
-
-        #[inline]
-        fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Poll<Self::Item> {
-            Pin::get_mut(self).as_mut().poll(cx, uuid)
-        }
-        fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
-            Pin::get_mut(self).as_mut().transaction_end(uuid);
-        }
     }
 
     /// A combination of two Signals.
@@ -147,21 +100,20 @@ mod signal {
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let mut this = self.project();
             let uuid = Uuid::new_v4().as_u128() as u32;
-            let mut result = Poll::Pending;
 
             if let Poll::Ready(v) = this.signal.as_mut().poll(cx, uuid) {
                 if let Some(o) = this.old.as_mut() {
                     if *o != v {
-                        result = Poll::Ready(v.clone());
+                        (this.f)(v.clone());
                         *o = v;
                     }
                 } else {
-                    result = Poll::Ready(v.clone());
+                    (this.f)(v.clone());
                     this.old.replace(v);
                 }
             }
             this.signal.as_mut().transaction_end(uuid);
-            return result;
+            Poll::Pending
         }
     }
 
@@ -171,7 +123,7 @@ mod signal {
         A: Future,
     {
         #[pin]
-        pub(crate) future: A,
+        pub(crate) future: A, //TODO RwLock + Clone
         pub(crate) value: Option<A::Output>,
     }
 
@@ -201,6 +153,25 @@ mod signal {
         }
     }
 
+    #[pin_project]
+    pub struct SignalValue<A> {
+        #[pin]
+        signal: A,
+    }
+
+    impl<A> Future for SignalValue<A>
+    where
+        A: Signal,
+        A::Item: Clone + PartialEq,
+    {
+        type Output = A::Item;
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let mut this = self.project();
+            this.signal.as_mut().poll(cx, 0)
+        }
+    }
+
+    // from future to signal
     pub trait Convert {}
 
     impl<T, A> Convert for T where T: Future<Output = A> {}
