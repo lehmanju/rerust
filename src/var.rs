@@ -67,3 +67,9 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
         self.0.value.read().unwrap().clone()
     }
 }
+
+impl<A: Clone + PartialEq> PartialEq for Var<A> {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}

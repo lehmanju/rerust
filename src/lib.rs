@@ -39,6 +39,7 @@ mod signal {
     ///
     /// It will poll both Signals and generate a new Signal by applying the internal callback.
     #[pin_project]
+    #[derive(Clone, PartialEq)]
     pub struct CombinedMap<A, B, C> {
         #[pin]
         pub(crate) signal_a: A,
@@ -119,6 +120,7 @@ mod signal {
     }
 
     #[pin_project]
+    #[derive(Clone, PartialEq)]
     pub struct Constant<A>
     where
         A: Future,
