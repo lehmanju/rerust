@@ -14,7 +14,6 @@ where
     value: RwLock<A>,
     transactions: RwLock<Vec<(u32, A)>>,
 }
-#[derive(Clone)]
 pub struct Var<A>(Arc<Inner<A>>)
 where
     A: Clone + PartialEq;
@@ -71,5 +70,11 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
 impl<A: Clone + PartialEq> PartialEq for Var<A> {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl<A: Clone + PartialEq> Clone for Var<A> {
+    fn clone(&self) -> Self {
+        Var(self.0.clone())
     }
 }

@@ -2,21 +2,21 @@ pub mod var;
 
 pub mod signal {
     use crate::var::Var;
-    use futures::{Future, Stream, pin_mut};
+    use futures::{pin_mut, Future, Stream};
     use pin_project::pin_project;
+    use pin_utils::unsafe_pinned;
     use std::{
         pin::Pin,
         sync::{Arc, RwLock},
         task::{Context, Poll},
     };
     use uuid::Uuid;
-    use pin_utils::unsafe_pinned;
 
     /// Signal trait modeling a changing value over time
     ///
     /// This can be seen as a Stream of values that never ends.
     #[must_use = "Signals do nothing unless polled"]
-    pub trait Signal : Clone + PartialEq {
+    pub trait Signal: Clone + PartialEq {
         type Item;
 
         /// Poll the signal
@@ -79,19 +79,31 @@ pub mod signal {
         }
     }
 
-    impl<A, B, C> PartialEq for CombinedMap<A, B, C> {
+    impl<A, B, C> PartialEq for CombinedMap<A, B, C>
+    where
+        A: Signal,
+        B: Signal,
+    {
         fn eq(&self, other: &Self) -> bool {
-        self.signal_a == other.signal_a && self.signal_b == other.signal_b && Arc::ptr_eq(self.callback, other.callback)
-    }
-    }
-
-    impl<A,B,C> Clone for CombinedMap<A, B, C> where A: Signal, B: Signal{
-        fn clone(&self) -> Self {
-            CombinedMap {signal_a: self.signal_a.clone(), signal_b: self.signal_b.clone(), callback: self.callback.clone()}
+            self.signal_a == other.signal_a
+                && self.signal_b == other.signal_b
+                && Arc::ptr_eq(&self.callback, &other.callback)
         }
     }
-        
-    
+
+    impl<A, B, C> Clone for CombinedMap<A, B, C>
+    where
+        A: Signal,
+        B: Signal,
+    {
+        fn clone(&self) -> Self {
+            CombinedMap {
+                signal_a: self.signal_a.clone(),
+                signal_b: self.signal_b.clone(),
+                callback: self.callback.clone(),
+            }
+        }
+    }
 
     /// Wraps a Signal in a Future.
     ///
@@ -136,42 +148,6 @@ pub mod signal {
         }
     }
 
-    #[pin_project]
-    #[derive(Clone, PartialEq)]
-    pub struct Constant<A>
-    where
-        A: Future,
-    {
-        #[pin]
-        pub(crate) future: A, //TODO RwLock + Clone
-        pub(crate) value: A::Output,
-    }
-
-    impl<A: Future> Signal for Constant<A>
-    where
-        A::Output: Clone + PartialEq,
-    {
-        type Item = A::Output;
-        fn poll(self: Pin<&mut Self>, cx: &mut Context, _: u32) -> Self::Item {
-            let mut this = self.project();
-
-            let fut_poll = this.future.as_mut().poll(cx);
-            match fut_poll {
-                Poll::Ready(value) => {
-                    *this.value = value.clone();
-                    value
-                }
-                Poll::Pending => this.value.clone(),
-            }
-        }
-        fn transaction_end(self: Pin<&mut Self>, _: u32) {
-            // nothing to do
-        }
-        fn value(&self) -> Self::Item {
-            self.value.clone()
-        }
-    }
-
     pub trait FoldSignalExt {
         type Item;
         fn fold_signal<T, F>(initial: T, f: F)
@@ -198,44 +174,39 @@ pub mod signal {
     }
 
     impl<S: Stream, A: Clone + PartialEq, F: Fn(A, S::Item) -> A> FoldSignalInner<S, A, F> {
-
         fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> A {
             let existing = self
-            .transactions
-            .iter()
-            .find(|(id, _)| *id == uuid)
-            .map(|(_, val)| (*val).clone());
+                .transactions
+                .iter()
+                .find(|(id, _)| *id == uuid)
+                .map(|(_, val)| (*val).clone());
 
             let mut this = self.project();
-            existing.unwrap_or(
-            match this.stream.as_mut().poll_next(cx) {
-                Poll::Ready(element) => {
-                    match element {
-                        Some(v) => {
-                            *this.acc = (this.f)(this.acc.clone(), v);
-                            this.acc.clone()
-                        }
-                        None => {
-                            this.acc.clone()
-                        }
-                    }                    
-                }
-                Poll::Pending => {
-                    this.acc.clone()
-                }
+            existing.unwrap_or(match this.stream.as_mut().poll_next(cx) {
+                Poll::Ready(element) => match element {
+                    Some(v) => {
+                        *this.acc = (this.f)(this.acc.clone(), v);
+                        this.acc.clone()
+                    }
+                    None => this.acc.clone(),
+                },
+                Poll::Pending => this.acc.clone(),
             })
         }
 
         fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
-
+            let this = self.project();
+            this.transactions.retain(|(u, _)| *u != uuid);
         }
 
         fn value(&self) -> A {
-
+            self.acc.clone()
         }
     }
-    
-    pub struct FoldSignal<S, A: Clone + PartialEq, F>(Arc<RwLock<Pin<Box<FoldSignalInner<S, A, F>>>>>);
+
+    pub struct FoldSignal<S, A: Clone + PartialEq, F>(
+        Arc<RwLock<Pin<Box<FoldSignalInner<S, A, F>>>>>,
+    );
 
     impl<S, A, F> Signal for FoldSignal<S, A, F>
     where
@@ -249,12 +220,13 @@ pub mod signal {
             let inner = &mut *self.0.write().unwrap();
             inner.as_mut().poll(cx, uuid)
         }
-        fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
+        fn transaction_end(mut self: Pin<&mut Self>, uuid: u32) {
             let inner = &mut *self.0.write().unwrap();
-            inner.transactions.retain(|(u, _)| *u != uuid);
+            inner.as_mut().transaction_end(uuid);
         }
         fn value(&self) -> Self::Item {
-            todo!()
+            let inner = &*self.0.read().unwrap();
+            inner.value()
         }
     }
 
@@ -266,9 +238,8 @@ pub mod signal {
 
     impl<S, A: Clone + PartialEq, F> PartialEq for FoldSignal<S, A, F> {
         fn eq(&self, other: &Self) -> bool {
-            Arc::ptr_eq(self.0, other.0)
+            Arc::ptr_eq(&self.0, &other.0)
         }
-        
     }
 
     // from future to signal
