@@ -1,8 +1,8 @@
+use futures::channel::mpsc;
 use futures::executor::ThreadPool;
 use futures::StreamExt;
-use futures::channel::mpsc;
-use rerust::signal::Signal;
-use rerust::{fold::FoldSignalExt, var::Var, combinators::CombinedMap};
+use rerust::signal::{FutureWrapperExt, Signal};
+use rerust::{combinators::CombinedMap, fold::FoldSignalExt, var::Var};
 
 fn main() {
     let pool = ThreadPool::new().expect("Failed to build pool");
@@ -25,9 +25,13 @@ fn main() {
         });
         let room2 = Var::new(vec![String::from("Me: a constant message")]);
         let room_list = CombinedMap::new(room1.clone(), room2.clone(), |r1, r2| vec![r1, r2]);
-        let index = Var::new(0);
+        let index = Var::new(0u32);
+
+        room1.on_change(|list| println!("List: {:?}", list)).await;
         //let selected_room =
     };
 
     futures::executor::block_on(routine);
+
+    // DSL mit eigenen Keywords
 }

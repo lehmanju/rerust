@@ -13,7 +13,7 @@ pub trait FoldSignalExt {
     where
         T: Clone + PartialEq,
         F: Fn(T, Self::Item) -> T,
-        Self: std::marker::Sized;
+        Self: Sized;
 }
 
 impl<T> FoldSignalExt for T

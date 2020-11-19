@@ -36,17 +36,14 @@ pub trait Signal: Clone + PartialEq {
 ///
 /// This is essentially the standard way of interacting with Signal values. The provided closure will be called on each Signal change. Reevaluation will only occur then.
 #[pin_project]
-pub struct FutureWrapper<A, B>
-where
-    A: Signal,
-{
+pub struct FutureWrapper<A, B, I> {
     #[pin]
     pub(crate) signal: A,
-    pub(crate) old: Option<A::Item>,
+    pub(crate) old: Option<I>,
     pub(crate) f: B,
 }
 
-impl<A, B> Future for FutureWrapper<A, B>
+impl<A, B> Future for FutureWrapper<A, B, A::Item>
 where
     A: Signal,
     B: FnMut(A::Item),
@@ -72,5 +69,30 @@ where
         }
         this.signal.as_mut().transaction_end(uuid);
         Poll::Pending
+    }
+}
+
+pub trait FutureWrapperExt {
+    type Item;
+    fn on_change<F>(self, f: F) -> FutureWrapper<Self, F, Self::Item>
+    where
+        F: FnMut(Self::Item),
+        Self: Sized;
+}
+
+impl<T> FutureWrapperExt for T
+where
+    T: Signal,
+{
+    type Item = T::Item;
+    fn on_change<F>(self, f: F) -> FutureWrapper<Self, F, Self::Item>
+    where
+        F: FnMut(Self::Item),
+    {
+        FutureWrapper {
+            signal: self,
+            old: Option::None,
+            f,
+        }
     }
 }
