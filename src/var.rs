@@ -4,7 +4,7 @@ use std;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::RwLock;
-use std::task::{Context, Poll};
+use std::task::Context;
 
 struct Inner<A>
 where

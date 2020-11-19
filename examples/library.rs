@@ -1,9 +1,8 @@
 use futures::executor::ThreadPool;
 use futures::StreamExt;
-use futures::{channel::mpsc, Stream};
-use rerust::signal::{CombinedMap, FoldSignal, FoldSignalExt, Signal};
-use rerust::var::Var;
-use std::sync::Arc;
+use futures::channel::mpsc;
+use rerust::signal::Signal;
+use rerust::{fold::FoldSignalExt, var::Var, combinators::CombinedMap};
 
 fn main() {
     let pool = ThreadPool::new().expect("Failed to build pool");
@@ -29,4 +28,6 @@ fn main() {
         let index = Var::new(0);
         //let selected_room =
     };
+
+    futures::executor::block_on(routine);
 }
