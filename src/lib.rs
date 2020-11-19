@@ -51,6 +51,22 @@ pub mod signal {
         pub(crate) callback: Arc<C>,
     }
 
+    impl<A, B, C, I> CombinedMap<A, B, C>
+    where
+        A: Signal,
+        B: Signal,
+        C: Fn(A::Item, B::Item) -> I + 'static,
+        I: Clone + PartialEq,
+    {
+        pub fn new(signal_a: A, signal_b: B, f: C) -> Self {
+            Self {
+                signal_a,
+                signal_b,
+                callback: Arc::new(f),
+            }
+        }
+    }
+
     impl<A, B, C, I> Signal for CombinedMap<A, B, C>
     where
         A: Signal,
@@ -150,11 +166,11 @@ pub mod signal {
 
     pub trait FoldSignalExt {
         type Item;
-        fn fold_signal<T, F>(initial: T, f: F)
+        fn fold_signal<T, F>(self, initial: T, f: F) -> FoldSignal<Self, T, F>
         where
-            F: FnMut(T, Self::Item) -> T,
-        {
-        }
+            T: Clone + PartialEq,
+            F: Fn(T, Self::Item) -> T,
+            Self: std::marker::Sized;
     }
 
     impl<T> FoldSignalExt for T
@@ -162,15 +178,28 @@ pub mod signal {
         T: Stream,
     {
         type Item = T::Item;
+        fn fold_signal<A, F>(self, initial: A, f: F) -> FoldSignal<Self, A, F>
+        where
+            A: Clone + PartialEq,
+            F: Fn(A, Self::Item) -> A,
+            Self: Sized,
+        {
+            FoldSignal(Arc::new(RwLock::new(Box::pin(FoldSignalInner {
+                stream: self,
+                acc: initial,
+                transactions: Vec::new(),
+                f,
+            }))))
+        }
     }
 
     #[pin_project]
     struct FoldSignalInner<S, A: Clone + PartialEq, F> {
         #[pin]
-        stream: S,
-        acc: A,
-        transactions: Vec<(u32, A)>,
-        f: F,
+        pub(crate) stream: S,
+        pub(crate) acc: A,
+        pub(crate) transactions: Vec<(u32, A)>,
+        pub(crate) f: F,
     }
 
     impl<S: Stream, A: Clone + PartialEq, F: Fn(A, S::Item) -> A> FoldSignalInner<S, A, F> {
@@ -241,9 +270,4 @@ pub mod signal {
             Arc::ptr_eq(&self.0, &other.0)
         }
     }
-
-    // from future to signal
-    pub trait Convert {}
-
-    impl<T, A> Convert for T where T: Future<Output = A> {}
 }
