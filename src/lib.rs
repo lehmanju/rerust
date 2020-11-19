@@ -2,7 +2,7 @@ pub mod var;
 
 pub mod signal {
     use crate::var::Var;
-    use futures::{pin_mut, Future, Stream};
+    use futures::{pin_mut, Future, Stream, task::AtomicWaker};
     use pin_project::pin_project;
     use pin_utils::unsafe_pinned;
     use std::{
@@ -189,6 +189,7 @@ pub mod signal {
                 acc: initial,
                 transactions: Vec::new(),
                 f,
+                waker: AtomicWaker::new(),
             }))))
         }
     }
@@ -200,10 +201,12 @@ pub mod signal {
         pub(crate) acc: A,
         pub(crate) transactions: Vec<(u32, A)>,
         pub(crate) f: F,
+        pub(crate) waker: AtomicWaker,
     }
 
     impl<S: Stream, A: Clone + PartialEq, F: Fn(A, S::Item) -> A> FoldSignalInner<S, A, F> {
         fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> A {
+            self.waker.register(cx.waker());
             let existing = self
                 .transactions
                 .iter()
