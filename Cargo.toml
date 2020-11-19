@@ -10,5 +10,6 @@ edition = "2018"
 futures-signals = "0.3"
 futures = { version = "0.3", features = ["thread-pool"] }
 pin-project = "1.0"
+pin-utils = "0.1"
 carboxyl = "0.2"
 uuid = { version = "0.8" , features = ["v4"] }
