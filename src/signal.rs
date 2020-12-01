@@ -2,7 +2,7 @@ use futures::Future;
 use pin_project::pin_project;
 use std::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{Context, Poll}, sync::atomic::AtomicBool,
 };
 use uuid::Uuid;
 
@@ -36,63 +36,21 @@ pub trait Signal: Clone + PartialEq {
 ///
 /// This is essentially the standard way of interacting with Signal values. The provided closure will be called on each Signal change. Reevaluation will only occur then.
 #[pin_project]
-pub struct FutureWrapper<A, B, I> {
+pub struct ValueStream<A, B, I> {
     #[pin]
     pub(crate) signal: A,
     pub(crate) old: Option<I>,
     pub(crate) f: B,
 }
 
-impl<A, B> Future for FutureWrapper<A, B, A::Item>
-where
-    A: Signal,
-    B: FnMut(A::Item),
-    A::Item: Clone + PartialEq,
-{
-    type Output = A::Item;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
-        let uuid = Uuid::new_v4().as_u128() as u32;
-        let v = this.signal.as_mut().poll(cx, uuid);
-
-        match this.old.as_mut() {
-            Some(o) => {
-                if *o != v {
-                    (this.f)(v.clone());
-                    *o = v;
-                }
-            }
-            None => {
-                (this.f)(v.clone());
-                this.old.replace(v);
-            }
-        }
-        this.signal.as_mut().transaction_end(uuid);
-        Poll::Pending
-    }
+pub struct GraphLock {
+    pub(crate) locked: AtomicBool,
+    pub(crate) id: u32
 }
 
-pub trait FutureWrapperExt {
-    type Item;
-    fn on_change<F>(self, f: F) -> FutureWrapper<Self, F, Self::Item>
-    where
-        F: FnMut(Self::Item),
-        Self: Sized;
-}
+static LOCKS: u32 = 0;
 
-impl<T> FutureWrapperExt for T
-where
-    T: Signal,
-{
-    type Item = T::Item;
-    fn on_change<F>(self, f: F) -> FutureWrapper<Self, F, Self::Item>
-    where
-        F: FnMut(Self::Item),
-    {
-        FutureWrapper {
-            signal: self,
-            old: Option::None,
-            f,
-        }
-    }
+pub fn new_lock() -> GraphLock {
+    LOCKS = LOCKS + 1;
+    GraphLock { locked: AtomicBool::new(false), id: LOCKS}
 }

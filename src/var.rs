@@ -42,7 +42,7 @@ impl<A: Clone + PartialEq> Signal for Var<A> {
         // lookup transaction list for previous evaluation
         let existing = inner
             .transactions
-            .iter()
+            .iter() 
             .find(|(id, _)| *id == uuid)
             .map(|(_, val)| (*val).clone());
         // use cached value or else current value

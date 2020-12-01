@@ -1,6 +1,6 @@
 use crate::signal::Signal;
 use pin_project::pin_project;
-use std::{pin::Pin, sync::Arc, task::Context};
+use std::{pin::Pin, sync::{atomic::AtomicBool, Arc}, task::Context};
 
 /// A combination of two Signals.
 ///
@@ -83,4 +83,39 @@ where
             callback: self.callback.clone(),
         }
     }
+}
+
+#[pin_project]
+pub struct Fold<S, A: Clone + PartialEq, F>
+{
+    #[pin]
+    signal: S,
+    acc: A,
+    f: F,
+    transactions: Vec<(u32, A)>
+}
+
+impl<S, A, F> Signal for Fold<S, A, F> where A: Clone + PartialEq, S: Signal, F: Fn(A, S::Item) -> A{
+    type Item = A;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> Self::Item {
+        todo!()
+    }
+    fn transaction_end(self: Pin<&mut Self>, uuid: u32) {
+        todo!()
+    }
+    fn value(&self) -> Self::Item {
+        todo!()
+    }
+    
+}
+
+impl<S, A, F> Clone for Fold<S, A, F>
+{
+    fn clone(&self) -> Self {
+        todo!()
+    }
+}
+
+impl PartialEq for Fold<S, A, F> {
+
 }

@@ -50,6 +50,7 @@ struct FoldSignalInner<S, A: Clone + PartialEq, F> {
 impl<S: Stream, A: Clone + PartialEq, F: Fn(A, S::Item) -> A> FoldSignalInner<S, A, F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context, uuid: u32) -> A {
         self.waker.register(cx.waker());
+        println!("Evaluating fold with uuid: {}", uuid);
         let existing = self
             .transactions
             .iter()
@@ -60,6 +61,7 @@ impl<S: Stream, A: Clone + PartialEq, F: Fn(A, S::Item) -> A> FoldSignalInner<S,
         existing.unwrap_or(match this.stream.as_mut().poll_next(cx) {
             Poll::Ready(element) => match element {
                 Some(v) => {
+                    println!("New element in Fold");
                     *this.acc = (this.f)(this.acc.clone(), v);
                     this.acc.clone()
                 }
