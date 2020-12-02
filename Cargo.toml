@@ -15,4 +15,5 @@ carboxyl = "0.2"
 uuid = { version = "0.8" , features = ["v4"] }
 petgraph = "0.5"
 syn = "1.0"
+quote = "1.0"
 proc-macro2 = "1.0"
