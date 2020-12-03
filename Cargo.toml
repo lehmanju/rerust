@@ -14,6 +14,9 @@ pin-utils = "0.1"
 carboxyl = "0.2"
 uuid = { version = "0.8" , features = ["v4"] }
 petgraph = "0.5"
-syn = "1.0"
+syn = { version = "1.0", features = ["full", "parsing"] }
 quote = "1.0"
 proc-macro2 = "1.0"
+
+[lib]
+proc-macro = true
