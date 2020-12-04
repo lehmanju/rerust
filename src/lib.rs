@@ -15,10 +15,12 @@ mod compiler {
     };
     use token::Paren;
 
+    #[derive(Debug)]
     pub struct ReBlock {
         pub stmts: Vec<ReLocal>,
     }
 
+    #[derive(Debug)]
     pub struct ReLocal {
         pub let_token: Let,
         pub ident: ReIdent,
@@ -26,10 +28,12 @@ mod compiler {
         pub semi_token: Semi,
     }
 
+    #[derive(Debug)]
     pub struct ReIdent {
         pub ident: Ident,
     }
 
+    #[derive(Debug)]
     pub enum ReExpr {
         Var(VarExpr),
         Evt(EvtExpr),
@@ -41,28 +45,33 @@ mod compiler {
         Filter(FilterExpr),
     }
 
+    #[derive(Debug)]
     pub struct ChoiceExpr {
         pub left_expr: Box<ReExpr>,
         pub oror: Token![||],
         pub right_expr: Box<ReExpr>,
     }
 
+    #[derive(Debug)]
     pub struct GroupExpr {
         pub paren: Paren,
         pub exprs: Punctuated<ReExpr, Token![,]>,
     }
 
+    #[derive(Debug)]
     pub struct VarExpr {
         pub var_token: kw::Var,
         pub brace: Paren,
         pub expr: Expr,
     }
 
+    #[derive(Debug)]
     pub struct EvtExpr {
         pub evt_token: kw::Evt,
         pub brace: Paren,
     }
 
+    #[derive(Debug)]
     pub struct MapExpr {
         pub left_expr: Box<ReExpr>,
         pub map_token: kw::map,
@@ -71,6 +80,7 @@ mod compiler {
         pub closure: ExprClosure,
     }
 
+    #[derive(Debug)]
     pub struct FoldExpr {
         pub left_expr: Box<ReExpr>,
         pub fold_token: kw::fold,
@@ -81,6 +91,7 @@ mod compiler {
         pub closure: ExprClosure,
     }
 
+    #[derive(Debug)]
     pub struct FilterExpr {
         pub left_expr: Box<ReExpr>,
         pub filter_token: kw::filter,
@@ -292,5 +303,6 @@ mod compiler {
 #[proc_macro]
 pub fn rerust(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as ReBlock);
-    todo!()
+    println!("AST: {:?}", input);
+    TokenStream::new()
 }
