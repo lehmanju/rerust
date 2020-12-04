@@ -1,17 +1,15 @@
-use compiler::{ReBlock, ReExpr};
+use compiler::ReBlock;
 use proc_macro::TokenStream;
-use syn::{
-    parse::{Parse, ParseStream},
-    parse_macro_input, Block, Local, Stmt,
-};
+use syn::parse_macro_input;
 
 mod compiler {
-    
+
     use syn::{
         parenthesized,
         parse::{Parse, ParseStream},
         punctuated::Punctuated,
-        token::{self, Let, Semi}, Error, Expr, ExprClosure, Ident, Pat, Token,
+        token::{self, Let, Semi},
+        Error, Expr, ExprClosure, Ident, Pat, Token,
     };
     use token::Paren;
 
