@@ -1,6 +1,9 @@
+use compiler::{ReBlock, ReExpr};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, Block, Local, Stmt};
-use compiler::ReBlock;
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input, Block, Local, Stmt,
+};
 
 mod compiler {
 
@@ -33,12 +36,20 @@ mod compiler {
     }
 
     pub enum ReExpr {
-        Ident(ReIdent),
-        Group(GroupExpr),
-        MethodCall(CallExpr),
         Var(VarExpr),
         Evt(EvtExpr),
+        Ident(ReIdent),
+        Group(GroupExpr),
+        Fold(FoldExpr),
         Choice(ChoiceExpr),
+        Map(MapExpr),
+        Filter(FilterExpr),
+    }
+
+    pub struct ChoiceExpr {
+        left_expr: Box<ReExpr>,
+        oror: Token![||],
+        right_expr: Box<ReExpr>,
     }
 
     pub struct GroupExpr {
@@ -57,38 +68,20 @@ mod compiler {
         brace: Brace,
     }
 
-    pub struct ChoiceExpr {
-        expr_left: Box<ReExpr>,
-        or_token: Token![||],
-        expr_right: Box<ReExpr>,
-    }
-
-    pub struct CallExpr {
-        expr_left: Box<ReExpr>,
-        dot_token: Token![.],
-        transform: ReTransform,
-    }
-
-    pub enum ReTransform {
-        Map(ReMap),
-        Fold(ReFold),
-        Filter(ReFilter),
-    }
-
-    pub struct ReMap {
+    pub struct MapExpr {
         map_token: kw::map,
         paren: Paren,
         closure: ExprClosure,
     }
 
-    pub struct ReFold {
+    pub struct FoldExpr {
         fold_token: kw::fold,
         paren: Paren,
         init_expr: Expr,
         closure: ExprClosure,
     }
 
-    pub struct ReFilter {
+    pub struct FilterExpr {
         filter_token: kw::filter,
         paren: Paren,
         closure: ExprClosure,
@@ -155,53 +148,17 @@ mod compiler {
 
     impl Parse for ReExpr {
         fn parse(input: ParseStream) -> syn::Result<Self> {
-            if input.peek(token::Paren) {
-                let content;
-                let paren_token = parenthesized!(content in input);
-                let mut elems = Punctuated::new();
-                let first: ReExpr = content.parse()?;
-                elems.push(first);
-                while !content.is_empty() {
-                    let punct = content.parse()?;
-                    elems.push(punct);
-                    if content.is_empty() {
-                        break;
-                    }
-                    let value = content.parse()?;
-                    elems.push(value);
-                }
-                Ok(ReExpr::Group(GroupExpr {
-                    paren_open: paren_token,
-                    exprs: elems,
-                }))
-            } else if input.peek(kw::Evt) {
-                let evt_token: kw::Evt = input.parse()?;
-                let content;
-                let braces = braced!(content in input);
-                if !content.is_empty() {
-                    return Err(Error::new(content.span(), "expected empty body"));
-                }
-                Ok(ReExpr::Evt(EvtExpr {
-                    evt_token,
-                    brace: braces,
-                }))
-            } else if input.peek(kw::Var) {
-                let var_token: kw::Var = input.parse()?;
-                let content;
-                let braces = braced!(content in input);
-                let expr: Expr = content.parse()?;
-                Ok(ReExpr::Var(VarExpr {
-                    var_token,
-                    brace: braces,
-                    expr,
-                }))
-            } else {
-                let ident: ReIdent = input.parse()?;
-                if input.peek(Token![.]) {
-                } else {
-                    Ok(ReExpr::Ident(ident))
-                }
+            let mut method_call = parse_method(input)?;
+            while input.peek(Token![||]) {
+                let choice_token: Token![||] = input.parse()?;
+                let choice_expr = parse_method(input)?;
+                method_call = ReExpr::Choice(ChoiceExpr {
+                    left_expr: Box::new(method_call),
+                    oror: choice_token,
+                    right_expr: Box::new(choice_expr),
+                })
             }
+            Ok(method_call)
         }
     }
 
@@ -213,6 +170,30 @@ mod compiler {
             }
             Ok(Self { ident })
         }
+    }
+
+    impl Parse for VarExpr {
+        fn parse(input: ParseStream) -> syn::Result<Self> {
+            todo!()
+        }
+    }
+
+    impl Parse for EvtExpr {
+        fn parse(input: ParseStream) -> syn::Result<Self> {
+            todo!()
+        }
+    }
+
+    fn parse_method(input: ParseStream) -> syn::Result<ReExpr> {
+        todo!()
+    }
+
+    fn parse_primary(input: ParseStream) -> syn::Result<ReExpr> {
+        todo!()
+    }
+
+    fn parse_transform(input: ParseStream) -> syn::Result<ReExpr> {
+        todo!()
     }
 }
 
