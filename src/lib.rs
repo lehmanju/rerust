@@ -1,17 +1,17 @@
-use compiler::ReBlock;
+use parser::ReBlock;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
-mod compiler {
+mod parser {
 
     use syn::{
         parenthesized,
         parse::{Parse, ParseStream},
         punctuated::Punctuated,
         token::{self, Let, Semi},
-        Error, Expr, ExprClosure, Ident, Pat, Token,
+        Error, Expr, Ident, Token, Type,
     };
-    use token::Paren;
+    use token::{Comma, Mut, Paren, RArrow, Ref};
 
     #[derive(Debug)]
     pub struct ReBlock {
@@ -67,6 +67,7 @@ mod compiler {
     pub struct EvtExpr {
         pub evt_token: kw::Evt,
         pub brace: Paren,
+        pub ty: Type,
     }
 
     #[derive(Debug)]
@@ -75,7 +76,7 @@ mod compiler {
         pub map_token: kw::map,
         pub dot_token: Token![.],
         pub paren: Paren,
-        pub closure: ExprClosure,
+        pub closure: ReClosure,
     }
 
     #[derive(Debug)]
@@ -86,7 +87,7 @@ mod compiler {
         pub paren: Paren,
         pub init_expr: Expr,
         pub comma_token: Token![,],
-        pub closure: ExprClosure,
+        pub closure: ReClosure,
     }
 
     #[derive(Debug)]
@@ -95,7 +96,24 @@ mod compiler {
         pub filter_token: kw::filter,
         pub dot_token: Token![.],
         pub paren: Paren,
-        pub closure: ExprClosure,
+        pub closure: ReClosure,
+    }
+
+    #[derive(Debug)]
+    pub struct ReClosure {
+        pub or1_token: Token![|],
+        pub inputs: Punctuated<ClosureInput, Comma>,
+        pub or2_token: Token![|],
+        pub output_arrow: RArrow,
+        pub return_type: Box<Type>,
+        pub body: Box<Expr>,
+    }
+
+    #[derive(Debug)]
+    pub struct ClosureInput {
+        pub by_ref: Option<Ref>,
+        pub mutability: Option<Mut>,
+        pub ident: ReIdent,
     }
 
     pub mod kw {
@@ -202,12 +220,11 @@ mod compiler {
             let evt: kw::Evt = input.parse()?;
             let content;
             let paren = parenthesized!(content in input);
-            if !content.is_empty() {
-                return Err(Error::new(content.span(), "unexpected expression"));
-            }
+            let ty = content.parse()?;
             Ok(Self {
                 evt_token: evt,
                 brace: paren,
+                ty,
             })
         }
     }
@@ -224,6 +241,51 @@ mod compiler {
         }
     }
 
+    impl Parse for ReClosure {
+        fn parse(input: ParseStream) -> syn::Result<Self> {
+            let or1_token = input.parse()?;
+            let mut inputs = Punctuated::new();
+            loop {
+                if input.peek(Token![|]) {
+                    break;
+                }
+                let value: ClosureInput = input.parse()?;
+                inputs.push(value);
+                if input.peek(Token![|]) {
+                    break;
+                }
+                let punct: Token![,] = input.parse()?;
+                inputs.push_punct(punct);
+            }
+            Ok(ReClosure {
+                or1_token,
+                inputs,
+                or2_token: input.parse()?,
+                output_arrow: input.parse()?,
+                return_type: input.parse()?,
+                body: Box::new(input.parse()?),
+            })
+        }
+    }
+
+    impl Parse for ClosureInput {
+        fn parse(input: ParseStream) -> syn::Result<Self> {
+            let mut ref_token = None;
+            if input.peek(Ref) {
+                ref_token = Some(input.parse()?);
+            }
+            let mut mut_token = None;
+            if input.peek(Mut) {
+                mut_token = Some(input.parse()?);
+            }
+            Ok(ClosureInput {
+                by_ref: ref_token,
+                mutability: mut_token,
+                ident: input.parse()?,
+            })
+        }
+    }
+
     fn parse_method(input: ParseStream) -> syn::Result<ReExpr> {
         let mut expr = parse_primary(input)?;
         let mut content;
@@ -232,7 +294,7 @@ mod compiler {
             if input.peek(kw::map) {
                 let map_token: kw::map = input.parse()?;
                 let paren = parenthesized!(content in input);
-                let closure = content.call(parse_closure)?;
+                let closure = content.parse()?;
                 expr = ReExpr::Map(MapExpr {
                     left_expr: Box::new(expr),
                     dot_token: dot,
@@ -243,7 +305,7 @@ mod compiler {
             } else if input.peek(kw::filter) {
                 let filter_token: kw::filter = input.parse()?;
                 let paren = parenthesized!(content in input);
-                let closure = content.call(parse_closure)?;
+                let closure = content.parse()?;
                 expr = ReExpr::Filter(FilterExpr {
                     left_expr: Box::new(expr),
                     dot_token: dot,
@@ -256,7 +318,7 @@ mod compiler {
                 let paren = parenthesized!(content in input);
                 let init: Expr = content.parse()?;
                 let comma = content.parse()?;
-                let closure = content.call(parse_closure)?;
+                let closure = content.parse()?;
                 expr = ReExpr::Fold(FoldExpr {
                     left_expr: Box::new(expr),
                     dot_token: dot,
@@ -282,25 +344,11 @@ mod compiler {
             Ok(ReExpr::Ident(input.parse()?))
         }
     }
-
-    fn parse_closure(input: ParseStream) -> syn::Result<ExprClosure> {
-        let closure: ExprClosure = input.parse()?;
-        closure.inputs.iter().try_for_each(|arg| match *arg {
-            Pat::Type(_) => Ok(()),
-            _ => {
-                return Err(Error::new(
-                    input.span(),
-                    "unexpected pattern in closure argument",
-                ));
-            }
-        })?;
-        Ok(closure)
-    }
 }
 
 #[proc_macro]
 pub fn rerust(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as ReBlock);
-    println!("AST: {:?}", input);
+    println!("AST: {:#?}", input);
     TokenStream::new()
 }
