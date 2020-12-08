@@ -20,7 +20,7 @@ pub struct ReLocal {
     pub semi_token: Semi,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ReIdent {
     pub ident: Ident,
 }
