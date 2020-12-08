@@ -1,10 +1,4 @@
-use syn::{
-    parenthesized,
-    parse::{Parse, ParseStream},
-    punctuated::Punctuated,
-    token::{self, Let, Semi},
-    Error, Expr, Ident, Token, Type,
-};
+use syn::{Error, Expr, Ident, Pat, Token, Type, parenthesized, parse::{Parse, ParseStream}, punctuated::Punctuated, token::{self, Let, Semi}};
 use token::{Comma, Mut, Paren, RArrow, Ref};
 
 #[derive(Debug)]
@@ -96,18 +90,11 @@ pub struct FilterExpr {
 #[derive(Debug)]
 pub struct ReClosure {
     pub or1_token: Token![|],
-    pub inputs: Punctuated<ClosureInput, Comma>,
+    pub inputs: Punctuated<Pat, Comma>,
     pub or2_token: Token![|],
     pub output_arrow: RArrow,
     pub return_type: Box<Type>,
     pub body: Box<Expr>,
-}
-
-#[derive(Debug)]
-pub struct ClosureInput {
-    pub by_ref: Option<Ref>,
-    pub mutability: Option<Mut>,
-    pub ident: ReIdent,
 }
 
 pub mod kw {
@@ -243,7 +230,7 @@ impl Parse for ReClosure {
             if input.peek(Token![|]) {
                 break;
             }
-            let value: ClosureInput = input.parse()?;
+            let value: Pat = input.parse()?;
             inputs.push(value);
             if input.peek(Token![|]) {
                 break;
@@ -258,24 +245,6 @@ impl Parse for ReClosure {
             output_arrow: input.parse()?,
             return_type: input.parse()?,
             body: Box::new(input.parse()?),
-        })
-    }
-}
-
-impl Parse for ClosureInput {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut ref_token = None;
-        if input.peek(Ref) {
-            ref_token = Some(input.parse()?);
-        }
-        let mut mut_token = None;
-        if input.peek(Mut) {
-            mut_token = Some(input.parse()?);
-        }
-        Ok(ClosureInput {
-            by_ref: ref_token,
-            mutability: mut_token,
-            ident: input.parse()?,
         })
     }
 }
