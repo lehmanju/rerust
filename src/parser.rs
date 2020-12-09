@@ -1,4 +1,10 @@
-use syn::{Error, Expr, Ident, Pat, Token, Type, parenthesized, parse::{Parse, ParseStream}, punctuated::Punctuated, token::{self, Let, Semi}};
+use syn::{
+    parenthesized,
+    parse::{Parse, ParseStream},
+    punctuated::Punctuated,
+    token::{self, Let, Semi},
+    Error, Expr, Ident, Pat, Token, Type,
+};
 use token::{Comma, Mut, Paren, RArrow, Ref};
 
 #[derive(Debug)]
@@ -10,7 +16,8 @@ pub struct ReBlock {
 pub struct ReLocal {
     pub let_token: Let,
     pub ident: ReIdent,
-    pub init: Option<(syn::token::Eq, ReExpr)>,
+    pub eq_token: Token![=],
+    pub init: ReExpr,
     pub semi_token: Semi,
 }
 
@@ -47,6 +54,10 @@ pub struct GroupExpr {
 #[derive(Debug)]
 pub struct VarExpr {
     pub var_token: kw::Var,
+    pub colon2_token: Token![::],
+    pub lt_token: Token![<],
+    pub ty: Type,
+    pub gt_token: Token![>],
     pub brace: Paren,
     pub expr: Expr,
 }
@@ -54,8 +65,11 @@ pub struct VarExpr {
 #[derive(Debug)]
 pub struct EvtExpr {
     pub evt_token: kw::Evt,
-    pub brace: Paren,
+    pub colon2_token: Token![::],
+    pub lt_token: Token![<],
     pub ty: Type,
+    pub gt_token: Token![>],
+    pub brace: Paren,
 }
 
 #[derive(Debug)]
@@ -93,7 +107,7 @@ pub struct ReClosure {
     pub inputs: Punctuated<Pat, Comma>,
     pub or2_token: Token![|],
     pub output_arrow: RArrow,
-    pub return_type: Box<Type>,
+    pub return_type: Type,
     pub body: Box<Expr>,
 }
 
@@ -142,15 +156,8 @@ impl Parse for ReLocal {
         Ok(ReLocal {
             let_token: input.parse()?,
             ident: input.parse()?,
-            init: {
-                if input.peek(Token![=]) {
-                    let eq_token: Token![=] = input.parse()?;
-                    let init: ReExpr = input.parse()?;
-                    Some((eq_token, init))
-                } else {
-                    None
-                }
-            },
+            eq_token: input.parse()?,
+            init: input.parse()?,
             semi_token: input.parse()?,
         })
     }
@@ -185,11 +192,19 @@ impl Parse for ReIdent {
 impl Parse for VarExpr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let var: kw::Var = input.parse()?;
+        let colon2_token = input.parse()?;
+        let lt_token = input.parse()?;
+        let ty = input.parse()?;
+        let gt_token = input.parse()?;
         let content;
         let paren = parenthesized!(content in input);
         let rust_expr: Expr = content.parse()?;
         Ok(Self {
             var_token: var,
+            colon2_token,
+            lt_token,
+            ty,
+            gt_token,
             brace: paren,
             expr: rust_expr,
         })
@@ -199,13 +214,22 @@ impl Parse for VarExpr {
 impl Parse for EvtExpr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let evt: kw::Evt = input.parse()?;
+        let colon2_token = input.parse()?;
+        let lt_token = input.parse()?;
+        let ty = input.parse()?;
+        let gt_token = input.parse()?;
         let content;
         let paren = parenthesized!(content in input);
-        let ty = content.parse()?;
+        if !content.is_empty() {
+            return Err(Error::new(paren.span, "unexpected expression"));
+        }
         Ok(Self {
             evt_token: evt,
-            brace: paren,
+            colon2_token,
+            lt_token,
             ty,
+            gt_token,
+            brace: paren,
         })
     }
 }
