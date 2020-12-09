@@ -2,7 +2,7 @@
 // check incoming and outgoing types
 // prefix for anonymous reactives
 
-use syn::{Expr, visit::Visit, Result};
+use syn::{Error, Expr, Result, visit::Visit};
 use crate::parser::{ReLocal, ReBlock, ReIdent, ReExpr, VarExpr, EvtExpr, GroupExpr, FoldExpr, MapExpr, ChoiceExpr, FilterExpr, ReClosure};
 use std::marker::PhantomData;
 use petgraph::Graph;
@@ -13,9 +13,9 @@ pub struct ReVisitor<'ast> {
 }
 
 pub struct ReNode<'ast> {
-    pub id: String,
+    pub id: &'ast ReIdent,
     pub initial: Option<&'ast Expr>,
-    pub ty: syn::Type,
+    pub ty: &'ast syn::Type,
     pub update_expr: &'ast ReClosure,
     pub source: bool
 }
@@ -27,14 +27,23 @@ pub struct ReEdge {
 
 impl<'ast> ReVisitor<'ast> {
     pub fn visit_reblock(&mut self, i: &'ast ReBlock) -> Result<()>{
-        let res ;
         for local in &i.stmts {
-           res = self.visit_relocal(local);
+           self.visit_relocal(local)?;
         }
         Ok(())
     }
     fn visit_relocal(&mut self, i: &'ast ReLocal) -> Result<()>{
-        
+        let name = &i.ident;
+        if self.reactive_ids.contains(&name) {
+            return Err(Error::new(name.ident.span(), "identifier already occupied"))
+        }
+        self.reactive_ids.push(name);
+        let node;
+        match i.init {
+            Some((_, init)) => {}
+            None => {}
+        }
+        Ok(())
     }
     fn visit_reident(&mut self, i: &'ast ReIdent)-> Result<()> {
         
