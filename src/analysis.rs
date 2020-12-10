@@ -15,33 +15,49 @@ pub struct ReVisitor<'ast> {
     pub graph: Graph<ReNode<'ast>, ReEdge>,
     name_nodes: Vec<(NameNode<'ast>, NodeIndex)>,
 }
-
+#[derive(Debug)]
 pub enum ReNode<'ast> {
     Source(SourceNode<'ast>),
     Name(NameNode<'ast>),
-    Reactive(ReactiveNode<'ast>),
+    Fold(FoldNode<'ast>),
+    Map(MapNode<'ast>),
     Group(Type),
     Choice(Type),
+    Filter(FilterNode<'ast>)
 }
 
+#[derive(Debug)]
 pub struct SourceNode<'ast> {
     pub initial: Option<&'ast Expr>,
     pub ty: &'ast Type,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NameNode<'ast> {
     pub id: &'ast ReIdent,
     pub ty: Type,
 }
 
-pub struct ReactiveNode<'ast> {
-    pub initial: Option<&'ast Expr>,
-    pub ty: &'ast syn::Type,
+#[derive(Debug)]
+pub struct FoldNode<'ast> {
+    pub initial:&'ast Expr,
+    pub ty: &'ast Type,
     pub update_expr: &'ast ReClosure,
 }
 
-#[derive(Clone)]
+#[derive(Debug)]
+pub struct MapNode<'ast> {
+    pub ty: &'ast Type,
+    pub update_expr: &'ast ReClosure,
+}
+
+#[derive(Debug)]
+pub struct FilterNode<'ast> {
+    pub ty: Type,
+    pub filter_expr: &'ast ReClosure,
+}
+
+#[derive(Clone, Debug)]
 pub struct ReEdge {
     ty: Type,
 }
@@ -60,7 +76,7 @@ impl<'ast> ReVisitor<'ast> {
         if self
             .name_nodes
             .iter()
-            .find(|(n, idx)| n.id.ident.to_string() == name_str)
+            .find(|(n, _)| n.id.ident.to_string() == name_str)
             .is_some()
         {
             return Err(Error::new(
@@ -100,7 +116,7 @@ impl<'ast> ReVisitor<'ast> {
                 let idx = self
                     .name_nodes
                     .iter()
-                    .find(|(n, idx)| n.id.ident.to_string() == identexpr.ident.to_string());
+                    .find(|(n, _)| n.id.ident.to_string() == identexpr.ident.to_string());
                 match idx {
                     Some((name, idx)) => Ok((idx.clone(), name.ty.clone())),
                     None => Err(Error::new(identexpr.ident.span(), "unknown reactive")),
@@ -132,13 +148,13 @@ impl<'ast> ReVisitor<'ast> {
             ReExpr::Fold(foldexpr) => {
                 let (incoming_idx, incoming_ty) = self.visit_reexpr(&foldexpr.left_expr)?;
                 let ty = self.visit_reclosure(&foldexpr.closure)?;
-                let node = ReNode::Reactive(ReactiveNode {
-                    initial: Some(&foldexpr.init_expr),
+                let node = ReNode::Fold(FoldNode {
+                    initial: &foldexpr.init_expr,
                     ty,
                     update_expr: &foldexpr.closure,
                 });
                 let idx = self.graph.add_node(node);
-                let edge = ReEdge { ty: ty.clone() };
+                let edge = ReEdge { ty: incoming_ty };
                 self.graph.add_edge(incoming_idx, idx, edge);
                 Ok((idx, ty.clone()))
             }
@@ -159,28 +175,39 @@ impl<'ast> ReVisitor<'ast> {
             ReExpr::Map(mapexpr) => {
                 let (incoming_idx, incoming_ty) = self.visit_reexpr(&mapexpr.left_expr)?;
                 let ty = self.visit_reclosure(&mapexpr.closure)?;
-                let node = ReNode::Reactive(ReactiveNode {
-                    initial: None,
+                let node = ReNode::Map(MapNode {
                     ty,
                     update_expr: &mapexpr.closure,
                 });
                 let idx = self.graph.add_node(node);
-                let edge = ReEdge { ty: ty.clone() };
+                let edge = ReEdge { ty: incoming_ty };
                 self.graph.add_edge(incoming_idx, idx, edge);
                 Ok((idx, ty.clone()))
             }
             ReExpr::Filter(filterexpr) => {
-                todo!("replace with map/fold")
+                let (incoming_idx, incoming_ty) = self.visit_reexpr(&filterexpr.left_expr)?;
+                let ty = self.visit_reclosure(&filterexpr.closure)?;
+                let node = ReNode::Filter(FilterNode {
+                    ty: incoming_ty.clone(), 
+                    filter_expr: &filterexpr.closure
+                });
+                let idx = self.graph.add_node(node);
+                let edge = ReEdge {ty: incoming_ty};
+                self.graph.add_edge(incoming_idx, idx, edge);
+                Ok((idx, ty.clone()))
             }
         }
     }
     fn visit_reclosure(&mut self, i: &'ast ReClosure) -> Result<&'ast Type> {
         Ok(&i.return_type)
     }
-    pub fn reactive_graph(&self, i: &'ast ReBlock) -> Graph<ReNode<'ast>, ReEdge> {
-        todo!()
+    pub fn reactive_graph(self) -> Graph<ReNode<'ast>, ReEdge> {
+        self.graph
     }
     pub fn new() -> Self {
-        todo!()
+        Self {
+            graph: Graph::new(),
+            name_nodes: Vec::new(),
+        }
     }
 }
