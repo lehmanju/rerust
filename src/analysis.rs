@@ -3,6 +3,7 @@
 // prefix for anonymous reactives
 
 use crate::parser::{ReBlock, ReClosure, ReExpr, ReIdent, ReLocal};
+use enum_dispatch::enum_dispatch;
 use petgraph::{graph::NodeIndex, Graph};
 use proc_macro2::Span;
 use syn::{
@@ -14,22 +15,44 @@ use syn::{
 pub struct ReVisitor<'ast> {
     pub graph: Graph<ReNode<'ast>, ReEdge>,
     name_nodes: Vec<(NameNode<'ast>, NodeIndex)>,
+    node_count: u32,
 }
+#[enum_dispatch(Generate)]
 #[derive(Debug)]
 pub enum ReNode<'ast> {
-    Source(SourceNode<'ast>),
+    Var(VarNode<'ast>),
+    Evt(EvtNode<'ast>),
     Name(NameNode<'ast>),
     Fold(FoldNode<'ast>),
     Map(MapNode<'ast>),
-    Group(Type),
-    Choice(Type),
-    Filter(FilterNode<'ast>)
+    Group(GroupNode),
+    Choice(ChoiceNode),
+    Filter(FilterNode<'ast>),
 }
 
 #[derive(Debug)]
-pub struct SourceNode<'ast> {
-    pub initial: Option<&'ast Expr>,
+pub struct GroupNode {
+    pub ty: Type,
+    pub id: u32,
+}
+
+#[derive(Debug)]
+pub struct ChoiceNode {
+    pub ty: Type,
+    pub id: u32,
+}
+
+#[derive(Debug)]
+pub struct EvtNode<'ast> {
     pub ty: &'ast Type,
+    pub id: u32,
+}
+
+#[derive(Debug)]
+pub struct VarNode<'ast> {
+    pub initial: &'ast Expr,
+    pub ty: &'ast Type,
+    pub id: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -40,21 +63,24 @@ pub struct NameNode<'ast> {
 
 #[derive(Debug)]
 pub struct FoldNode<'ast> {
-    pub initial:&'ast Expr,
+    pub initial: &'ast Expr,
     pub ty: &'ast Type,
     pub update_expr: &'ast ReClosure,
+    pub id: u32,
 }
 
 #[derive(Debug)]
 pub struct MapNode<'ast> {
     pub ty: &'ast Type,
     pub update_expr: &'ast ReClosure,
+    pub id: u32,
 }
 
 #[derive(Debug)]
 pub struct FilterNode<'ast> {
     pub ty: Type,
     pub filter_expr: &'ast ReClosure,
+    pub id: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -97,17 +123,19 @@ impl<'ast> ReVisitor<'ast> {
     fn visit_reexpr(&mut self, i: &'ast ReExpr) -> Result<(NodeIndex, Type)> {
         match i {
             ReExpr::Var(varexpr) => {
-                let node = ReNode::Source(SourceNode {
-                    initial: Some(&varexpr.expr),
+                let node = ReNode::Var(VarNode {
+                    initial: &varexpr.expr,
                     ty: &varexpr.ty,
+
+                    id: self.next_idx(),
                 });
                 let idx = self.graph.add_node(node);
                 Ok((idx, varexpr.ty.clone()))
             }
             ReExpr::Evt(evtexpr) => {
-                let node = ReNode::Source(SourceNode {
-                    initial: None,
+                let node = ReNode::Evt(EvtNode {
                     ty: &evtexpr.ty,
+                    id: self.next_idx(),
                 });
                 let idx = self.graph.add_node(node);
                 Ok((idx, evtexpr.ty.clone()))
@@ -137,7 +165,10 @@ impl<'ast> ReVisitor<'ast> {
                     },
                     elems: incoming_types,
                 });
-                let node = ReNode::Group(ty.clone());
+                let node = ReNode::Group(GroupNode {
+                    ty: ty.clone(),
+                    id: self.next_idx(),
+                });
                 let idx = self.graph.add_node(node);
                 for (nidx, nty) in incoming_nodes {
                     let edge = ReEdge { ty: nty };
@@ -152,6 +183,7 @@ impl<'ast> ReVisitor<'ast> {
                     initial: &foldexpr.init_expr,
                     ty,
                     update_expr: &foldexpr.closure,
+                    id: self.next_idx(),
                 });
                 let idx = self.graph.add_node(node);
                 let edge = ReEdge { ty: incoming_ty };
@@ -165,7 +197,10 @@ impl<'ast> ReVisitor<'ast> {
                 if a_ty != b_ty {
                     return Err(Error::new(span, "mismatching types"));
                 }
-                let node = ReNode::Choice(a_ty.clone());
+                let node = ReNode::Choice(ChoiceNode {
+                    ty: a_ty.clone(),
+                    id: self.next_idx(),
+                });
                 let idx = self.graph.add_node(node);
                 let edge = ReEdge { ty: a_ty.clone() };
                 self.graph.add_edge(a_idx, idx, edge.clone());
@@ -178,6 +213,7 @@ impl<'ast> ReVisitor<'ast> {
                 let node = ReNode::Map(MapNode {
                     ty,
                     update_expr: &mapexpr.closure,
+                    id: self.next_idx(),
                 });
                 let idx = self.graph.add_node(node);
                 let edge = ReEdge { ty: incoming_ty };
@@ -188,15 +224,21 @@ impl<'ast> ReVisitor<'ast> {
                 let (incoming_idx, incoming_ty) = self.visit_reexpr(&filterexpr.left_expr)?;
                 let ty = self.visit_reclosure(&filterexpr.closure)?;
                 let node = ReNode::Filter(FilterNode {
-                    ty: incoming_ty.clone(), 
-                    filter_expr: &filterexpr.closure
+                    ty: incoming_ty.clone(),
+                    filter_expr: &filterexpr.closure,
+                    id: self.next_idx(),
                 });
                 let idx = self.graph.add_node(node);
-                let edge = ReEdge {ty: incoming_ty};
+                let edge = ReEdge { ty: incoming_ty };
                 self.graph.add_edge(incoming_idx, idx, edge);
                 Ok((idx, ty.clone()))
             }
         }
+    }
+    fn next_idx(&mut self) -> u32 {
+        let res = self.node_count;
+        self.node_count += 1;
+        res
     }
     fn visit_reclosure(&mut self, i: &'ast ReClosure) -> Result<&'ast Type> {
         Ok(&i.return_type)
@@ -208,6 +250,7 @@ impl<'ast> ReVisitor<'ast> {
         Self {
             graph: Graph::new(),
             name_nodes: Vec::new(),
+            node_count: 0u32,
         }
     }
 }

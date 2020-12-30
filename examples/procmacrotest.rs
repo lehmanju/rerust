@@ -12,5 +12,4 @@ rerust! {
 ///
 /// impl ReTrait for ReProgram
 
-fn main() {
-}
+fn main() {}

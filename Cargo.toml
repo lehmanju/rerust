@@ -17,6 +17,7 @@ petgraph = "0.5"
 syn = { version = "1.0", features = [ "full", "parsing", "extra-traits", "visit" ] }
 quote = "1.0"
 proc-macro2 = "1.0"
+enum_dispatch = "0.3"
 
 [lib]
 proc-macro = true
