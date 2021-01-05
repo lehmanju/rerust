@@ -3,9 +3,9 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::{self, Let, Semi},
-    Error, Expr, Ident, Pat, Token, Type,
+    Error, Expr, Ident, Pat, PatType, Token, Type,
 };
-use token::{Comma, Mut, Paren, RArrow, Ref};
+use token::{Comma, Paren, RArrow};
 
 #[derive(Debug)]
 pub struct ReBlock {
@@ -254,7 +254,17 @@ impl Parse for ReClosure {
             if input.peek(Token![|]) {
                 break;
             }
-            let value: Pat = input.parse()?;
+            let pat: Pat = input.parse()?;
+            let value: Pat = if input.peek(Token![:]) {
+                Pat::Type(PatType {
+                    attrs: Vec::new(),
+                    pat: Box::new(pat),
+                    colon_token: input.parse()?,
+                    ty: input.parse()?,
+                })
+            } else {
+                pat
+            };
             inputs.push(value);
             if input.peek(Token![|]) {
                 break;
