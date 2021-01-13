@@ -3,9 +3,9 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::analysis::{
-    ChoiceNode, EvtNode, FilterNode, FoldNode, GroupNode, NameNode, ReEdge, VarNode,
+    ChoiceNode, FilterNode, FoldNode, GroupNode,
 };
-use crate::analysis::{MapNode, ReNode};
+use crate::analysis::MapNode;
 use petgraph::{graph::NodeIndex, visit::Topo, Graph};
 
 use super::Generate;
@@ -19,9 +19,9 @@ impl Generate for MapNode<'_> {
 
         quote! {
             #[inline]
-            fn #name (#args) -> #return_type {
+            fn #name (#args) -> #return_type 
                 #body
-            }
+            
         }
     }
 
@@ -71,9 +71,9 @@ impl Generate for FoldNode<'_> {
         let body = &self.update_expr.body;
         quote! {
             #[inline]
-            fn #name (#args) -> #return_type {
+            fn #name (#args) -> #return_type 
                 #body
-            }
+            
         }
     }
 
@@ -192,9 +192,9 @@ impl Generate for FilterNode<'_> {
         let expr_body = &self.filter_expr.body;
         quote! {
             #[inline]
-            fn #func_name(#expr_inputs) -> bool {
+            fn #func_name(#expr_inputs) -> bool 
                 #expr_body
-            }
+            
         }
     }
 

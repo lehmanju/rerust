@@ -356,9 +356,9 @@ impl Program {
     }
     #[inline]
     fn map_4((a, b, evt): (i32, u32, i32)) -> u32 {
-        {
+        
             (a + b as i32 + evt) as u32
-        }
+        
     }
     #[inline]
     fn map_6((a, b): (i32, u32)) -> u32 {

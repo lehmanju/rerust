@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::{self, Let, Semi},
-    Error, Expr, Ident, Pat, PatType, Token, Type,
+    Error, Expr, Ident, Pat, PatType, Token, Type, Block,
 };
 use token::{Comma, Paren, RArrow};
 
@@ -108,7 +108,7 @@ pub struct ReClosure {
     pub or2_token: Token![|],
     pub output_arrow: RArrow,
     pub return_type: Type,
-    pub body: Box<Expr>,
+    pub body: Box<Block>,
 }
 
 pub mod kw {
