@@ -1,4 +1,3 @@
-
 mod generated {
     use rerust::rerust_gen;
 

@@ -99,11 +99,7 @@ impl<'ast> ReVisitor<'ast> {
         let (last_idx, last_ty) = self.visit_reexpr(&i.init)?;
         let name = &i.ident;
         let name_str = name.ident.to_string();
-        if self
-            .name_nodes
-            .iter()
-            .any(|(n, _)| n.id.ident == name_str)
-        {
+        if self.name_nodes.iter().any(|(n, _)| n.id.ident == name_str) {
             return Err(Error::new(
                 i.ident.ident.span(),
                 "identifier already occupied",

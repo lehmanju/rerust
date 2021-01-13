@@ -2,11 +2,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
 
-use crate::analysis::{
-    EvtNode, VarNode,
-};
-
-
+use crate::analysis::{EvtNode, VarNode};
 
 use super::Generate;
 

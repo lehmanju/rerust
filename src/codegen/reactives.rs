@@ -2,11 +2,8 @@ use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
 
-use crate::analysis::{
-    ChoiceNode, FilterNode, FoldNode, GroupNode,
-};
 use crate::analysis::MapNode;
-
+use crate::analysis::{ChoiceNode, FilterNode, FoldNode, GroupNode};
 
 use super::Generate;
 
@@ -19,9 +16,9 @@ impl Generate for MapNode<'_> {
 
         quote! {
             #[inline]
-            fn #name (#args) -> #return_type 
+            fn #name (#args) -> #return_type
                 #body
-            
+
         }
     }
 
@@ -71,9 +68,9 @@ impl Generate for FoldNode<'_> {
         let body = &self.update_expr.body;
         quote! {
             #[inline]
-            fn #name (#args) -> #return_type 
+            fn #name (#args) -> #return_type
                 #body
-            
+
         }
     }
 
@@ -192,9 +189,9 @@ impl Generate for FilterNode<'_> {
         let expr_body = &self.filter_expr.body;
         quote! {
             #[inline]
-            fn #func_name(#expr_inputs) -> bool 
+            fn #func_name(#expr_inputs) -> bool
                 #expr_body
-            
+
         }
     }
 

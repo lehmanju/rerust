@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     token::{self, Let, Semi},
-    Error, Expr, Ident, Pat, PatType, Token, Type, Block,
+    Block, Error, Expr, Ident, Pat, PatType, Token, Type,
 };
 use token::{Comma, Paren, RArrow};
 
