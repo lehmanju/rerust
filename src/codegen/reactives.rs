@@ -28,18 +28,16 @@ impl Generate for MapNode<'_> {
     fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
         let incoming_node = &incoming[0];
         let name = self.ident();
-        let func_name = self.ident();
         (
             quote! {
-                let mut #name = state.#func_name;
-
-                    state.#name = if change.#incoming_node {
+                if change.#incoming_node {
                     let val = state.#incoming_node.clone().unwrap();
-                    let result = Self::#func_name(val);
-                    if state.#func_name.is_none() || result != state.#func_name.unwrap() {
-                        change.#func_name = true;
-                        #name = Some(result);
-                    }}
+                    let result = Self::#name(val);
+                    if state.#name.is_none() || result != *state.#name.as_ref().unwrap() {
+                        change.#name = true;
+                        state.#name = Some(result);
+                    }
+                }
             },
             quote! {
                 #name,
@@ -82,24 +80,18 @@ impl Generate for FoldNode<'_> {
     fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
         let incoming_node = &incoming[0];
         let name = self.ident();
-        let func_name = self.ident();
         (
             quote! {
-                let #name =
                 if change.#incoming_node {
-                    let val = #incoming_node.unwrap();
-                    let result = Self::#func_name(state.#func_name.clone().unwrap(), val);
-                    if result != state.#func_name.unwrap() {
-                        change.#func_name = true;
+                    let val = state.#incoming_node.clone().unwrap();
+                    let result = Self::#name(state.#name.clone().unwrap(), val);
+                    if result != *state.#name.as_ref().unwrap() {
+                        change.#name = true;
+                        state.#name = Some(result);
                     }
-                    Some(result)
-                } else {
-                    state.#func_name
-                };
+                }
             },
-            quote! {
-                #func_name,
-            },
+            quote! {},
         )
     }
 
@@ -133,12 +125,11 @@ impl Generate for GroupNode {
         let name = self.ident();
         (
             quote! {
-                let mut #name = state.#name;
                 if #tks_ifb {
                     if #tks_ifa {
                         change.#name = true;
                     }
-                    #name = Some((#tks_ret));
+                    state.#name = Some((#tks_ret));
                 }
             },
             quote! {
@@ -173,10 +164,10 @@ fn gen_group_update(mut ident: Vec<Ident>) -> (TokenStream, TokenStream, TokenSt
                 change.#elem
             },
             quote! {
-                !#elem.is_none()
+                !state.#elem.is_none()
             },
             quote! {
-                #elem.unwrap()
+                state.#elem.clone().unwrap()
             },
         )
     } else {
@@ -187,9 +178,9 @@ fn gen_group_update(mut ident: Vec<Ident>) -> (TokenStream, TokenStream, TokenSt
                 change.#a || #if_clausea
             },
             quote! {
-                !#a.is_none() && #if_clauseb
+                !state.#a.is_none() && #if_clauseb
             },
-            quote! {#a.unwrap(), #ret},
+            quote! {state.#a.clone().unwrap(), #ret},
         )
     }
 }
@@ -212,12 +203,11 @@ impl Generate for FilterNode<'_> {
         let incoming_node = &incoming[0];
         (
             quote! {
-                let mut #name = state.#name;
                 if change.#incoming_node {
-                    let val = #incoming_node.unwrap();
+                    let val = #incoming_node.clone().unwrap();
                     if Self::#name(&val) {
                         change.#name = true;
-                        #name = Some(val);
+                        state.#name = Some(val);
                     }
                 }
             },
@@ -255,12 +245,11 @@ impl Generate for ChoiceNode {
         let (a, b) = (&incoming[0], &incoming[1]);
         (
             quote! {
-                let mut #name = state.#name;
                 if change.#a {
-                    #name = #a;
+                    state.#name = state.#a.clone();
                     change.#name = true;
                 } else if change.#b {
-                    #name = #b;
+                    state.#name = state.#b.clone();
                     change.#name = true;
                 }
             },

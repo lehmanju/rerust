@@ -85,7 +85,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             pub fn run(&mut self) {
                 let Program {state, observers, sources} = self;
                 let changes = Self::update(state, sources);
-                self.notify(observers, changes, state);
+                Self::notify(observers, changes, state);
             }
 
             pub fn new() -> Self {
@@ -178,10 +178,11 @@ impl Generate for NameNode<'_> {
                 self.observers.#name.push(observer);
             }
         };
-        if income.to_string().starts_with("var_") || income.to_string().starts_with("evt_") {
+        if incoming[0].to_string().starts_with("var") || incoming[0].to_string().starts_with("evt")
+        {
             quote! {
                 pub fn #sink(&self) -> Sender<#ty> {
-                    #income
+                    Self::#income(&self.sources)
                 }
 
                 #common

@@ -1,10 +1,10 @@
 use ::rerust::rerust_gen;
-use std::rc::Weak;
-use std::cell::RefCell;
-use futures::task::Poll;
 use futures::stream::FusedStream;
 use futures::stream::Stream;
+use futures::task::Poll;
 use pin_utils::pin_mut;
+use std::cell::RefCell;
+use std::rc::Weak;
 use std::sync::mpsc::*;
 pub struct State {
     evt_2: Option<i32>,
@@ -129,15 +129,15 @@ impl Program {
             _ => None,
         };
         if change.evt_2 {
-            let val = state.evt_2.as_ref().unwrap();
-            let result = Self::fold_8(state.fold_8.clone().unwrap(), val.clone());
+            let val = state.evt_2.clone().unwrap();
+            let result = Self::fold_8(state.fold_8.clone().unwrap(), val);
             if result != *state.fold_8.as_ref().unwrap() {
                 change.fold_8 = true;
+                state.fold_8 = Some(result);
             }
-            state.fold_8 = Some(result)
         }
         let val = Self::var_1(&mut sources.var_1.1, None);
-        let var_1 = match val {
+        state.var_1 = match val {
             Some(v) => {
                 change.var_1 = true;
                 Some(v)
@@ -145,51 +145,50 @@ impl Program {
             None => state.var_1,
         };
         let val = Self::var_0(&mut sources.var_0.1, None);
-        let var_0 = match val {
+        state.var_0 = match val {
             Some(v) => {
                 change.var_0 = true;
                 Some(v)
             }
             None => state.var_0,
         };
-        let mut group_3 = state.group_3;
-        if !var_0.is_none() && !var_1.is_none() && !state.evt_2.is_none() {
+        if !state.var_0.is_none() && !state.var_1.is_none() && !state.evt_2.is_none() {
             if change.var_0 || change.var_1 || change.evt_2 {
                 change.group_3 = true;
             }
-            group_3 = Some((var_0.unwrap(), var_1.unwrap(), state.evt_2.unwrap()));
+            state.group_3 = Some((
+                state.var_0.clone().unwrap(),
+                state.var_1.clone().unwrap(),
+                state.evt_2.clone().unwrap(),
+            ));
         }
-        let mut map_4 = state.map_4;
         if change.group_3 {
-            let val = group_3.unwrap();
+            let val = state.group_3.clone().unwrap();
             let result = Self::map_4(val);
-            if state.map_4.is_none() || result != state.map_4.unwrap() {
+            if state.map_4.is_none() || result != *state.map_4.as_ref().unwrap() {
                 change.map_4 = true;
-                map_4 = Some(result);
+                state.map_4 = Some(result);
             }
         }
-        let mut group_5 = state.group_5;
-        if !var_0.is_none() && !var_1.is_none() {
+        if !state.var_0.is_none() && !state.var_1.is_none() {
             if change.var_0 || change.var_1 {
                 change.group_5 = true;
             }
-            group_5 = Some((var_0.unwrap(), var_1.unwrap()));
+            state.group_5 = Some((state.var_0.clone().unwrap(), state.var_1.clone().unwrap()));
         }
-        let mut map_6 = state.map_6;
         if change.group_5 {
-            let val = group_5.unwrap();
+            let val = state.group_5.clone().unwrap();
             let result = Self::map_6(val);
-            if state.map_6.is_none() || result != state.map_6.unwrap() {
+            if state.map_6.is_none() || result != *state.map_6.as_ref().unwrap() {
                 change.map_6 = true;
-                map_6 = Some(result);
+                state.map_6 = Some(result);
             }
         }
-        let mut choice_7 = state.choice_7;
         if change.map_6 {
-            choice_7 = map_6;
+            state.choice_7 = state.map_6.clone();
             change.choice_7 = true;
         } else if change.map_4 {
-            choice_7 = map_4;
+            state.choice_7 = state.map_4.clone();
             change.choice_7 = true;
         }
         change
@@ -203,7 +202,8 @@ impl Program {
                         true
                     } else {
                         {
-                          unreachable!()}
+                            unreachable!()
+                        }
                     }
                 } else {
                     false
@@ -218,7 +218,8 @@ impl Program {
                         true
                     } else {
                         {
-                           unreachable!() }
+                            unreachable!()
+                        }
                     }
                 } else {
                     false
@@ -233,7 +234,8 @@ impl Program {
                         true
                     } else {
                         {
-                            unreachable!() }
+                            unreachable!()
+                        }
                     }
                 } else {
                     false
@@ -248,7 +250,8 @@ impl Program {
                         true
                     } else {
                         {
-                        unreachable!() }
+                            unreachable!()
+                        }
                     }
                 } else {
                     false
@@ -263,7 +266,8 @@ impl Program {
                         true
                     } else {
                         {
-                       unreachable!()}
+                            unreachable!()
+                        }
                     }
                 } else {
                     false
@@ -299,6 +303,9 @@ impl Program {
     fn sender_evt_2(sources: &Sources) -> Sender<i32> {
         sources.evt_2.0.clone()
     }
+    pub fn get_sink_evt(&self) -> Sender<i32> {
+        Self::sender_evt_2(&self.sources)
+    }
     pub fn observe_evt(&mut self, observer: Weak<RefCell<dyn FnMut(&i32)>>) {
         self.observers.evt.push(observer);
     }
@@ -323,6 +330,9 @@ impl Program {
     fn sender_var_1(sources: &Sources) -> Sender<u32> {
         sources.var_1.0.clone()
     }
+    pub fn get_sink_b(&self) -> Sender<u32> {
+        Self::sender_var_1(&self.sources)
+    }
     pub fn observe_b(&mut self, observer: Weak<RefCell<dyn FnMut(&u32)>>) {
         self.observers.b.push(observer);
     }
@@ -337,6 +347,9 @@ impl Program {
     #[inline]
     fn sender_var_0(sources: &Sources) -> Sender<i32> {
         sources.var_0.0.clone()
+    }
+    pub fn get_sink_a(&self) -> Sender<i32> {
+        Self::sender_var_0(&self.sources)
     }
     pub fn observe_a(&mut self, observer: Weak<RefCell<dyn FnMut(&i32)>>) {
         self.observers.a.push(observer);
