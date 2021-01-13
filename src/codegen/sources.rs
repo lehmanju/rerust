@@ -38,7 +38,7 @@ impl Generate for VarNode<'_> {
             quote! {
 
                     let val = Self::#name(&mut sources.#name.1, None);
-                    let #name =
+                    state.#name =
                     match val {
                         Some(v) => {
                             change.#name = true;
@@ -116,7 +116,7 @@ impl Generate for EvtNode<'_> {
             quote! {
 
                     let val = Self::#name(&mut sources.#name.1);
-                    let #name =
+                    state.#name =
                     match val {
                         Some(v) => {
                             change.#name = true;

@@ -17,6 +17,36 @@ pub struct State {
     map_6: Option<u32>,
     choice_7: Option<u32>,
 }
+#[automatically_derived]
+#[allow(unused_qualifications)]
+impl ::core::clone::Clone for State {
+    #[inline]
+    fn clone(&self) -> State {
+        match *self {
+            State {
+                evt_2: ref __self_0_0,
+                fold_8: ref __self_0_1,
+                var_1: ref __self_0_2,
+                var_0: ref __self_0_3,
+                group_3: ref __self_0_4,
+                map_4: ref __self_0_5,
+                group_5: ref __self_0_6,
+                map_6: ref __self_0_7,
+                choice_7: ref __self_0_8,
+            } => State {
+                evt_2: ::core::clone::Clone::clone(&(*__self_0_0)),
+                fold_8: ::core::clone::Clone::clone(&(*__self_0_1)),
+                var_1: ::core::clone::Clone::clone(&(*__self_0_2)),
+                var_0: ::core::clone::Clone::clone(&(*__self_0_3)),
+                group_3: ::core::clone::Clone::clone(&(*__self_0_4)),
+                map_4: ::core::clone::Clone::clone(&(*__self_0_5)),
+                group_5: ::core::clone::Clone::clone(&(*__self_0_6)),
+                map_6: ::core::clone::Clone::clone(&(*__self_0_7)),
+                choice_7: ::core::clone::Clone::clone(&(*__self_0_8)),
+            },
+        }
+    }
+}
 pub struct Change {
     evt_2: bool,
     evt: bool,
@@ -88,24 +118,23 @@ pub struct Program {
     sources: Sources,
 }
 impl Program {
-    fn update(state: State, sources: &mut Sources) -> (State, Change) {
+    fn update(state: &mut State, sources: &mut Sources) -> Change {
         let mut change = Change::default();
         let val = Self::evt_2(&mut sources.evt_2.1);
-        let evt_2 = match val {
+        state.evt_2 = match val {
             Some(v) => {
                 change.evt_2 = true;
                 Some(v)
             }
             _ => None,
         };
-        let mut fold_8 = state.fold_8;
         if change.evt_2 {
-            let val = evt_2.unwrap();
-            let result = Self::fold_8(state.fold_8.clone().unwrap(), val);
-            if result != state.fold_8.unwrap() {
+            let val = state.evt_2.as_ref().unwrap();
+            let result = Self::fold_8(state.fold_8.clone().unwrap(), val.clone());
+            if result != *state.fold_8.as_ref().unwrap() {
                 change.fold_8 = true;
-                fold_8 = Some(result);
             }
+            state.fold_8 = Some(result)
         }
         let val = Self::var_1(&mut sources.var_1.1, None);
         let var_1 = match val {
@@ -124,11 +153,11 @@ impl Program {
             None => state.var_0,
         };
         let mut group_3 = state.group_3;
-        if !var_0.is_none() && !var_1.is_none() && !evt_2.is_none() {
+        if !var_0.is_none() && !var_1.is_none() && !state.evt_2.is_none() {
             if change.var_0 || change.var_1 || change.evt_2 {
                 change.group_3 = true;
             }
-            group_3 = Some((var_0.unwrap(), var_1.unwrap(), evt_2.unwrap()));
+            group_3 = Some((var_0.unwrap(), var_1.unwrap(), state.evt_2.unwrap()));
         }
         let mut map_4 = state.map_4;
         if change.group_3 {
@@ -158,31 +187,24 @@ impl Program {
         let mut choice_7 = state.choice_7;
         if change.map_6 {
             choice_7 = map_6;
+            change.choice_7 = true;
         } else if change.map_4 {
             choice_7 = map_4;
+            change.choice_7 = true;
         }
-        (
-            State {
-                evt_2,
-                fold_8,
-                var_1,
-                var_0,
-                group_3,
-                map_4,
-                group_5,
-                map_6,
-                choice_7,
-            },
-            change,
-        )
+        change
     }
-    fn notify(&mut self, changes: Change, state: &State) {
-        let observers = &mut self.observers;
+    fn notify(observers: &mut Observers, changes: Change, state: &State) {
         if changes.evt_2 {
             observers.evt.retain(|lst| {
                 if let Some(cb) = Weak::upgrade(lst) {
-                    (&mut *cb.borrow_mut())(&state.evt_2.unwrap());
-                    true
+                    if let Some(val) = &state.evt_2 {
+                        (&mut *cb.borrow_mut())(val);
+                        true
+                    } else {
+                        {
+                          unreachable!()}
+                    }
                 } else {
                     false
                 }
@@ -191,8 +213,13 @@ impl Program {
         if changes.fold_8 {
             observers.evt_fold.retain(|lst| {
                 if let Some(cb) = Weak::upgrade(lst) {
-                    (&mut *cb.borrow_mut())(&state.fold_8.unwrap());
-                    true
+                    if let Some(val) = &state.fold_8 {
+                        (&mut *cb.borrow_mut())(val);
+                        true
+                    } else {
+                        {
+                           unreachable!() }
+                    }
                 } else {
                     false
                 }
@@ -201,8 +228,13 @@ impl Program {
         if changes.var_1 {
             observers.b.retain(|lst| {
                 if let Some(cb) = Weak::upgrade(lst) {
-                    (&mut *cb.borrow_mut())(&state.var_1.unwrap());
-                    true
+                    if let Some(val) = &state.var_1 {
+                        (&mut *cb.borrow_mut())(val);
+                        true
+                    } else {
+                        {
+                            unreachable!() }
+                    }
                 } else {
                     false
                 }
@@ -211,8 +243,13 @@ impl Program {
         if changes.var_0 {
             observers.a.retain(|lst| {
                 if let Some(cb) = Weak::upgrade(lst) {
-                    (&mut *cb.borrow_mut())(&state.var_0.unwrap());
-                    true
+                    if let Some(val) = &state.var_0 {
+                        (&mut *cb.borrow_mut())(val);
+                        true
+                    } else {
+                        {
+                        unreachable!() }
+                    }
                 } else {
                     false
                 }
@@ -221,8 +258,13 @@ impl Program {
         if changes.choice_7 {
             observers.c.retain(|lst| {
                 if let Some(cb) = Weak::upgrade(lst) {
-                    (&mut *cb.borrow_mut())(&state.choice_7.unwrap());
-                    true
+                    if let Some(val) = &state.choice_7 {
+                        (&mut *cb.borrow_mut())(val);
+                        true
+                    } else {
+                        {
+                       unreachable!()}
+                    }
                 } else {
                     false
                 }
@@ -230,9 +272,13 @@ impl Program {
         }
     }
     pub fn run(&mut self) {
-        let (new_state, changes) = Self::update(self.state, &mut self.sources);
-        self.state = new_state;
-        self.notify(changes, &self.state);
+        let Program {
+            state,
+            observers,
+            sources,
+        } = self;
+        let changes = Self::update(state, sources);
+        Self::notify(observers, changes, state);
     }
     pub fn new() -> Self {
         Self {

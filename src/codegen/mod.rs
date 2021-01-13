@@ -50,6 +50,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use pin_utils::pin_mut;
         use std::sync::mpsc::*;
 
+        #[derive(Clone)]
         pub struct State {
             #tks_state
         }
@@ -71,21 +72,20 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
 
         impl Program {
-            fn update(state: State, sources: &mut Sources) -> (State, Change) {
+            fn update(state: &mut State, sources: &mut Sources) -> Change {
                 let mut change = Change::default();
                 #tks_update
-                (State { #tks_update_return }, change)
+                change
             }
 
-            fn notify(&mut self, changes: Change, state: &State) {
-                let observers = &mut self.observers;
+            fn notify(observers: &mut Observers, changes: Change, state: &State) {
                 #tks_notify
             }
 
             pub fn run(&mut self) {
-                let (new_state, changes) = Self::update(self.state, &mut self.sources);
-                self.state = new_state;
-                self.notify(changes, &self.state);
+                let Program {state, observers, sources} = self;
+                let changes = Self::update(state, sources);
+                self.notify(observers, changes, state);
             }
 
             pub fn new() -> Self {
@@ -198,8 +198,13 @@ impl Generate for NameNode<'_> {
             if changes.#income {
                 observers.#ident.retain(|lst| {
                     if let Some(cb) = Weak::upgrade(lst) {
-                        (&mut *cb.borrow_mut())(&state.#income.unwrap());
-                        true
+                        if let Some(val) = &state.#income {
+                            (&mut *cb.borrow_mut())(val);
+                            true
+                        } else
+                        {
+                            unreachable!()
+                        }
                     } else {
                         false
                     }

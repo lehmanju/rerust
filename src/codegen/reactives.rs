@@ -33,8 +33,8 @@ impl Generate for MapNode<'_> {
             quote! {
                 let mut #name = state.#func_name;
 
-                    if change.#incoming_node {
-                    let val = #incoming_node.unwrap();
+                    state.#name = if change.#incoming_node {
+                    let val = state.#incoming_node.clone().unwrap();
                     let result = Self::#func_name(val);
                     if state.#func_name.is_none() || result != state.#func_name.unwrap() {
                         change.#func_name = true;
@@ -85,15 +85,17 @@ impl Generate for FoldNode<'_> {
         let func_name = self.ident();
         (
             quote! {
-                let mut #name = state.#func_name;
+                let #name =
                 if change.#incoming_node {
                     let val = #incoming_node.unwrap();
                     let result = Self::#func_name(state.#func_name.clone().unwrap(), val);
                     if result != state.#func_name.unwrap() {
                         change.#func_name = true;
-                        #name = Some(result);
                     }
-                }
+                    Some(result)
+                } else {
+                    state.#func_name
+                };
             },
             quote! {
                 #func_name,
@@ -256,8 +258,10 @@ impl Generate for ChoiceNode {
                 let mut #name = state.#name;
                 if change.#a {
                     #name = #a;
+                    change.#name = true;
                 } else if change.#b {
                     #name = #b;
+                    change.#name = true;
                 }
             },
             quote! {
