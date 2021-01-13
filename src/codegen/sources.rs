@@ -3,10 +3,10 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::analysis::{
-    ChoiceNode, EvtNode, FilterNode, FoldNode, GroupNode, NameNode, ReEdge, VarNode,
+    EvtNode, VarNode,
 };
-use crate::analysis::{MapNode, ReNode};
-use petgraph::{graph::NodeIndex, visit::Topo, Graph};
+
+
 
 use super::Generate;
 

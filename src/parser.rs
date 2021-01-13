@@ -120,7 +120,7 @@ pub mod kw {
 }
 
 fn is_keyword(str: String) -> bool {
-    match str.to_string().as_str() {
+    match str.as_str() {
         "Var" | "Evt" | "map" | "fold" | "filter" => true,
         _ => false,
     }

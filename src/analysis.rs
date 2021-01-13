@@ -102,8 +102,7 @@ impl<'ast> ReVisitor<'ast> {
         if self
             .name_nodes
             .iter()
-            .find(|(n, _)| n.id.ident.to_string() == name_str)
-            .is_some()
+            .any(|(n, _)| n.id.ident == name_str)
         {
             return Err(Error::new(
                 i.ident.ident.span(),
@@ -144,9 +143,9 @@ impl<'ast> ReVisitor<'ast> {
                 let idx = self
                     .name_nodes
                     .iter()
-                    .find(|(n, _)| n.id.ident.to_string() == identexpr.ident.to_string());
+                    .find(|(n, _)| identexpr.ident == n.id.ident);
                 match idx {
-                    Some((name, idx)) => Ok((idx.clone(), name.ty.clone())),
+                    Some((name, idx)) => Ok((*idx, name.ty.clone())),
                     None => Err(Error::new(identexpr.ident.span(), "unknown reactive")),
                 }
             }
