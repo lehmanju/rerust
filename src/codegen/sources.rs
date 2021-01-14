@@ -34,16 +34,9 @@ impl Generate for VarNode<'_> {
             quote! {
 
                     let val = Self::#name(&mut sources.#name.1, None);
-                    state.#name =
-                    match val {
-                        Some(v) => {
-                            change.#name = true;
-                            Some(v)
-                        }
-                        None => {
-                            state.#name
-                        }
-                    };
+                    if let Some(v) = val {
+                        state.#name = Some(v);
+                    }
 
             },
             quote! {
