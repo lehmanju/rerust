@@ -15,10 +15,6 @@ mod generated {
     }
 }
 
-/// struct ReProgram
-///
-/// impl ReTrait for ReProgram
-
 fn main() {
     let mut prog = generated::Program::new();
     let name_sink: Sender<String> = prog.get_sink_name();
@@ -34,12 +30,11 @@ fn main() {
     }
     name_sink.send(format!("Bob"));
     text_sink.send(format!("Hi Alice, nice to meet you!"));
-    index_sink.send(1);
-    for _ in 0..10 {
-        prog.run();
-    }
+    //index_sink.send(1);
+    prog.run();
 }
 
 fn observer_cb(history: &Vec<String>) {
     println!("history: {:?}", history);
 }
+

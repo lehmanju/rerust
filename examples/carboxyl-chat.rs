@@ -1,8 +1,7 @@
 use carboxyl::{Signal, Sink, Stream};
 
 fn main() {
-    let sink = Sink::new();
-    sink.send(String::from("Bob: Hi Bob!"));
+    let sink: Sink<String> = Sink::new();    
     let name = Signal::new(String::from(""));
     let text = sink.stream();
     // what does move do here? how does carboxyl do async?
@@ -16,5 +15,11 @@ fn main() {
     let room2 = Signal::new(vec![String::from("Me: a constant message")]);
     let room_list = Signal::new(vec![room1, room2]);
     let index = Signal::new(0);
-    // let selected_room = Signal::new
+    let index_c = index.clone();
+    let selected_room = room_list.map(move |room_list| {
+        let idx = index.sample();
+        room_list[idx].clone()
+    });
+
+    sink.send(String::from("Bob: Hi Bob!"));
 }
