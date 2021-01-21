@@ -44,10 +44,6 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     quote! {
         use std::rc::Weak;
         use std::cell::RefCell;
-        use futures::task::Poll;
-        use futures::stream::FusedStream;
-        use futures::stream::Stream;
-        use pin_utils::pin_mut;
         use std::sync::mpsc::*;
 
         #[derive(Clone)]
