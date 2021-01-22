@@ -19,6 +19,7 @@ fn main() {
     let mut prog = generated::Program::new();
     let mut sink = prog.sink().clone();
     sink.take_all(prog.sink());
+    //let text_card = sink.pull_text();
 
     let observer = Rc::new(RefCell::new(observer_cb)) as Rc<_>;
     prog.observe_selected_room(Rc::downgrade(&observer));

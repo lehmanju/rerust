@@ -27,8 +27,9 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_slots = TokenStream::new();
     let mut tks_sink_fn = TokenStream::new();
     let mut tks_input_fn = TokenStream::new();
-    let mut tks_slot_check = quote! {false};
+    let mut tks_slot_check = quote! {true};
     let mut tks_take_all = TokenStream::new();
+    let mut tks_slot_init = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_idents(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
@@ -40,6 +41,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_input_fn.extend(tks_if.input_fn);
         tks_take_all.extend(tks_if.take_all);
         tks_slot_check.extend(tks_if.check_input);
+        tks_slot_init.extend(tks_if.slot_init);
         let (state_members, state_default) = weight.gen_state();
         tks_state.extend(state_members);
         tks_input_struct.extend(tks_if.input_struct_part);
@@ -93,6 +95,13 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         struct Slots {
             #tks_slots
         }
+        impl Slots {
+            fn new() -> Self {
+                Self {
+                #tks_slot_init
+                }
+            }
+        }
 
         pub struct Sink {
             slots: Slots,
@@ -123,7 +132,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             }
             pub fn new(sender: Sender<Input>) -> Self {
                 Self {
-                    slots: Slots::default(),
+                    slots: Slots::new(),
                     channel_sender: sender,
                 }
             }
@@ -199,6 +208,7 @@ pub struct InterfaceTokens {
     input_fn: TokenStream,
     check_input: TokenStream,
     take_all: TokenStream,
+    slot_init: TokenStream,
 }
 
 #[enum_dispatch]
@@ -307,10 +317,14 @@ impl Generate for NameNode<'_> {
         ift.card_struct = quote! {
             pub struct #card_name {
                 data: Phantom,
+
             }
         };
         ift.slot_part = quote! {
             #name: Option<#card_name>,
+        };
+        ift.slot_init = quote! {
+            #name: Some(#card_name {data: Phantom{}}),
         };
         let push_card = format_ident!("push_{}", name);
         let pull_card = format_ident!("pull_{}", name);
@@ -334,7 +348,7 @@ impl Generate for NameNode<'_> {
             }
         };
         ift.check_input = quote! {
-            || self.slots.#name.is_some() || input.#incoming_node.is_none()
+            && (self.slots.#name.is_some() || input.#incoming_node.is_none())
         };
     }
         ift
