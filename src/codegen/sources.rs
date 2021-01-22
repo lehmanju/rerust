@@ -73,6 +73,8 @@ impl Generate for EvtNode<'_> {
                 if inputs.#name.is_some() {
                     state.#name = inputs.#name;
                     change.#name = true;
+                } else {
+                    state.#name = None;
                 }
             },
             quote! {
