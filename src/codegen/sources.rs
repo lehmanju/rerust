@@ -4,7 +4,7 @@ use quote::quote;
 
 use crate::analysis::{EvtNode, VarNode};
 
-use super::Generate;
+use super::{InterfaceTokens, Generate};
 
 impl Generate for VarNode<'_> {
     fn gen_function(&self, _: &Vec<Ident>) -> TokenStream {
@@ -12,19 +12,7 @@ impl Generate for VarNode<'_> {
         let sender_func = format_ident!("sender_{}", name);
         let ty = self.ty;
         quote! {
-            #[inline]
-            fn #name(stream: &Receiver<#ty>, old_val: Option<#ty>) -> Option<#ty> {
-                let result = stream.try_recv();
-                match result {
-                    Ok(val) => Self::#name(stream, Some(val)),
-                    _ => old_val,
-                }
-            }
-
-            #[inline]
-            fn #sender_func(sources: &Sources) -> Sender<#ty> {
-                sources.#name.0.clone()
-            }
+        
         }
     }
 
@@ -32,12 +20,10 @@ impl Generate for VarNode<'_> {
         let name = self.ident();
         (
             quote! {
-
-                    let val = Self::#name(&mut sources.#name.1, None);
-                    if let Some(v) = val {
-                        state.#name = Some(v);
+                    if inputs.#name.is_some() {
+                        state.#name = inputs.#name;
+                        change.#name = true;
                     }
-
             },
             quote! {
                 #name,
@@ -63,17 +49,10 @@ impl Generate for VarNode<'_> {
         format_ident!("var_{}", self.id)
     }
 
-    fn gen_source(&self) -> (TokenStream, TokenStream) {
-        let ident = self.ident();
-        let ty = self.ty;
-        (
-            quote! {
-                #ident: (Sender<#ty>, Receiver<#ty>),
-            },
-            quote! {
-                #ident: channel(),
-            },
-        )
+    fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
+        let mut ift = InterfaceTokens::default();
+        ift.input_struct_part = self.gen_state().0;
+        ift
     }
 }
 
@@ -83,19 +62,7 @@ impl Generate for EvtNode<'_> {
         let ty = self.ty;
         let sender_func = format_ident!("sender_{}", name);
         quote! {
-            #[inline]
-            fn #name(stream: &Receiver<#ty>) -> Option<#ty> {
-                let result = stream.try_recv();
-                match result {
-                    Ok(val) => Some(val),
-                    _ => None,
-                }
-            }
-
-            #[inline]
-            fn #sender_func(sources: &Sources) -> Sender<#ty> {
-                sources.#name.0.clone()
-            }
+            
         }
     }
 
@@ -103,17 +70,10 @@ impl Generate for EvtNode<'_> {
         let name = self.ident();
         (
             quote! {
-
-                    let val = Self::#name(&mut sources.#name.1);
-                    state.#name =
-                    match val {
-                        Some(v) => {
-                            change.#name = true;
-                            Some(v)
-                        }
-                        _ => None
-                    };
-
+                if inputs.#name.is_some() {
+                    state.#name = inputs.#name;
+                    change.#name = true;
+                }
             },
             quote! {
                 #name,
@@ -134,17 +94,10 @@ impl Generate for EvtNode<'_> {
         )
     }
 
-    fn gen_source(&self) -> (TokenStream, TokenStream) {
-        let ident = self.ident();
-        let ty = self.ty;
-        (
-            quote! {
-                #ident: (Sender<#ty>, Receiver<#ty>),
-            },
-            quote! {
-                #ident: channel(),
-            },
-        )
+    fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
+        let mut ift = InterfaceTokens::default();
+        ift.input_struct_part = self.gen_state().0;
+        ift
     }
 
     fn ident(&self) -> Ident {

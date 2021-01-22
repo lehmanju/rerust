@@ -18,6 +18,6 @@ pub fn rerust_gen(input: TokenStream) -> TokenStream {
         return result.unwrap_err().to_compile_error().into();
     }
     let graph = visitor.reactive_graph();
-    println!("{:#?}", Dot::new(&graph));
+    //println!("{:#?}", Dot::new(&graph));
     generate(&graph).into()
 }

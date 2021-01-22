@@ -20,19 +20,29 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_update = TokenStream::new();
     let mut tks_update_return = TokenStream::new();
     let mut tks_observers = TokenStream::new();
-    let mut tks_sources = TokenStream::new();
+    let mut tks_input_struct = TokenStream::new();
     let mut tks_notify = TokenStream::new();
     let mut tks_default_state = TokenStream::new();
-    let mut tks_sources_default = TokenStream::new();
+    let mut tks_card_structs = TokenStream::new();
+    let mut tks_slots = TokenStream::new();
+    let mut tks_sink_fn = TokenStream::new();
+    let mut tks_input_fn = TokenStream::new();
+    let mut tks_slot_check = quote! {false};
+    let mut tks_take_all = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_idents(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
         tks_change.extend(weight.gen_change());
-        let (sources, sources_default) = weight.gen_source();
-        tks_sources.extend(sources);
-        tks_sources_default.extend(sources_default);
+        let tks_if = weight.gen_source(&incoming);        
+        tks_card_structs.extend(tks_if.card_struct);
+        tks_slots.extend(tks_if.slot_part);
+        tks_sink_fn.extend(tks_if.sink_fn);
+        tks_input_fn.extend(tks_if.input_fn);
+        tks_take_all.extend(tks_if.take_all);
+        tks_slot_check.extend(tks_if.check_input);
         let (state_members, state_default) = weight.gen_state();
         tks_state.extend(state_members);
+        tks_input_struct.extend(tks_if.input_struct_part);
         tks_default_state.extend(state_default);
         tks_function.extend(weight.gen_function(incoming));
         let (update, update_return) = weight.gen_update(incoming);
@@ -45,6 +55,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::rc::Weak;
         use std::cell::RefCell;
         use std::sync::mpsc::*;
+        use std::mem;
 
         #[derive(Clone)]
         pub struct State {
@@ -58,19 +69,73 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         pub struct Observers {
             #tks_observers
         }
-        pub struct Sources {
-            #tks_sources
-        }
         pub struct Program {
             state: State,
             observers: Observers,
-            sources: Sources,
+            receiver: Receiver<Input>,
+            sink: Sink,
+        }
+
+        #[derive(Default)]
+        pub struct Input {
+            #tks_input_struct
+        }
+
+        impl Input {
+            #tks_input_fn
+        }
+
+        struct Phantom {}
+        
+        #tks_card_structs
+
+        #[derive(Default)]
+        struct Slots {
+            #tks_slots
+        }
+
+        pub struct Sink {
+            slots: Slots,
+            channel_sender: Sender<Input>,
+        }
+
+        impl Clone for Sink {
+            fn clone(&self) -> Self {
+                Self { slots: Slots::default(), channel_sender: self.channel_sender.clone() }
+            }
+        }
+
+        impl Sink {
+            #tks_sink_fn
+
+            pub fn take_all(&mut self, other: &mut Self) {
+                #tks_take_all
+            }
+
+            pub fn send(&mut self, input: Input) {
+                if (#tks_slot_check)
+                {
+                    self.channel_sender.send(input);
+                } else
+                {
+                    panic!("Slot empty for one input");
+                }
+            }
+            pub fn new(sender: Sender<Input>) -> Self {
+                Self {
+                    slots: Slots::default(),
+                    channel_sender: sender,
+                }
+            }
         }
 
         impl Program {
-            fn update(state: &mut State, sources: &mut Sources) -> Change {
+            fn update(state: &mut State, receiver: &mut Receiver<Input>) -> Change {
                 let mut change = Change::default();
-                #tks_update
+                let result = receiver.try_recv();
+                if let Ok(inputs) = result {
+                    #tks_update
+                }                
                 change
             }
 
@@ -79,17 +144,23 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             }
 
             pub fn run(&mut self) {
-                let Program {state, observers, sources} = self;
-                let changes = Self::update(state, sources);
+                let Program {state, observers, receiver, sink} = self;
+                let changes = Self::update(state, receiver);
                 Self::notify(observers, changes, state);
             }
 
             pub fn new() -> Self {
+                let (send,recv) = channel();
                 Self {
                     state: State::default(),
                     observers: Observers::default(),
-                    sources: Sources::default(),
+                    receiver: recv,
+                    sink: Sink::new(send),
                 }
+            }
+
+            pub fn sink(&mut self) -> &mut Sink { 
+                &mut self.sink
             }
 
             #tks_function
@@ -99,14 +170,6 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             fn default() -> Self {
                 Self {
                     #tks_default_state
-                }
-            }
-        }
-
-        impl Default for Sources {
-            fn default() -> Self {
-                Self {
-                    #tks_sources_default
                 }
             }
         }
@@ -124,6 +187,18 @@ fn get_incoming_idents(graph: &Graph<ReNode, ReEdge>, idx: NodeIndex) -> Vec<Ide
         }
     }
     idents
+}
+
+
+#[derive(Default)]
+pub struct InterfaceTokens {
+    input_struct_part: TokenStream,
+    card_struct: TokenStream,
+    slot_part: TokenStream,
+    sink_fn: TokenStream,
+    input_fn: TokenStream,
+    check_input: TokenStream,
+    take_all: TokenStream,
 }
 
 #[enum_dispatch]
@@ -150,8 +225,8 @@ pub trait Generate {
             #ident: bool,
         }
     }
-    fn gen_source(&self) -> (TokenStream, TokenStream) {
-        (TokenStream::new(), TokenStream::new())
+    fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
+        InterfaceTokens::default()
     }
     fn gen_observer(&self) -> TokenStream {
         TokenStream::new()
@@ -165,26 +240,12 @@ pub trait Generate {
 impl Generate for NameNode<'_> {
     fn gen_function(&self, incoming: &Vec<Ident>) -> TokenStream {
         let ident = format_ident!("observe_{}", self.ident());
-        let sink = format_ident!("get_sink_{}", self.ident());
         let name = self.ident();
-        let income = format_ident!("sender_{}", &incoming[0]);
         let ty = &self.ty;
-        let common = quote! {
+        quote! {
             pub fn #ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
                 self.observers.#name.push(observer);
             }
-        };
-        if incoming[0].to_string().starts_with("var") || incoming[0].to_string().starts_with("evt")
-        {
-            quote! {
-                pub fn #sink(&self) -> Sender<#ty> {
-                    Self::#income(&self.sources)
-                }
-
-                #common
-            }
-        } else {
-            common
         }
     }
 
@@ -228,5 +289,54 @@ impl Generate for NameNode<'_> {
 
     fn ident(&self) -> Ident {
         self.id.ident.clone()
+    }
+
+    fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
+        let name = self.ident();
+        let ty = &self.ty;
+        let incoming_node = &incoming[0];
+        let mut ift = InterfaceTokens::default();
+        if incoming_node.to_string().starts_with("var") || incoming_node.to_string().starts_with("evt") {
+        let input_fn_name = format_ident!("set_{}", name);
+        ift.input_fn = quote! {
+            pub fn #input_fn_name(&mut self, value: #ty) {
+                self.#incoming_node = Some(value);
+            }
+        };
+        let card_name = format_ident!("Card{}", name);
+        ift.card_struct = quote! {
+            pub struct #card_name {
+                data: Phantom,
+            }
+        };
+        ift.slot_part = quote! {
+            #name: Option<#card_name>,
+        };
+        let push_card = format_ident!("push_{}", name);
+        let pull_card = format_ident!("pull_{}", name);
+        let send_single = format_ident!("send_{}", name);
+        ift.sink_fn = quote! {
+            pub fn #push_card(&mut self, card: #card_name) {
+                self.slots.#name = Some(card);
+            }
+            pub fn #pull_card(&mut self) -> Option<#card_name> {
+                self.slots.#name.take()
+            }
+            pub fn #send_single(&mut self, value: #ty) {
+                let mut input = Input::default();
+                input.#input_fn_name(value);
+                self.send(input);
+            }
+        };
+        ift.take_all = quote! {
+            if other.slots.#name.is_some() {
+                mem::swap(&mut self.slots.#name, &mut other.slots.#name);
+            }
+        };
+        ift.check_input = quote! {
+            || self.slots.#name.is_some() || input.#incoming_node.is_none()
+        };
+    }
+        ift
     }
 }

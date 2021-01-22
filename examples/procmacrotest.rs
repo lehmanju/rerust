@@ -17,21 +17,21 @@ mod generated {
 
 fn main() {
     let mut prog = generated::Program::new();
-    let name_sink: Sender<String> = prog.get_sink_name();
-    let text_sink: Sender<String> = prog.get_sink_text();
-    let index_sink: Sender<usize> = prog.get_sink_index();
+    let mut sink = prog.sink().clone();
+    sink.take_all(prog.sink());
+
     let observer = Rc::new(RefCell::new(observer_cb)) as Rc<_>;
     prog.observe_selected_room(Rc::downgrade(&observer));
-    name_sink.send(format!("Alice"));
-    text_sink.send(format!("Hi bob!"));
-    text_sink.send(format!("My name is Alice ;)"));
-    for _ in 0..2 {
+
+    sink.send_name(format!("Alice"));
+    sink.send_text(format!("Hi bob!"));
+    sink.send_text(format!("My name is Alice ;)"));
+    sink.send_name(format!("Bob"));
+    sink.send_text(format!("Hi Alice, nice to meet you!"));
+    sink.send_index(1);
+    for _ in 0..5 {
         prog.run();
     }
-    name_sink.send(format!("Bob"));
-    text_sink.send(format!("Hi Alice, nice to meet you!"));
-    //index_sink.send(1);
-    prog.run();
 }
 
 fn observer_cb(history: &Vec<String>) {
