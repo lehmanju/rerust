@@ -4,16 +4,14 @@ use quote::quote;
 
 use crate::analysis::{EvtNode, VarNode};
 
-use super::{InterfaceTokens, Generate};
+use super::{Generate, InterfaceTokens};
 
 impl Generate for VarNode<'_> {
     fn gen_function(&self, _: &Vec<Ident>) -> TokenStream {
         let name = self.ident();
         let sender_func = format_ident!("sender_{}", name);
         let ty = self.ty;
-        quote! {
-        
-        }
+        quote! {}
     }
 
     fn gen_update(&self, _incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
@@ -61,9 +59,7 @@ impl Generate for EvtNode<'_> {
         let name = self.ident();
         let ty = self.ty;
         let sender_func = format_ident!("sender_{}", name);
-        quote! {
-            
-        }
+        quote! {}
     }
 
     fn gen_update(&self, _incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {

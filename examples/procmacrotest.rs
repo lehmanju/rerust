@@ -38,4 +38,3 @@ fn main() {
 fn observer_cb(history: &Vec<String>) {
     println!("history: {:?}", history);
 }
-

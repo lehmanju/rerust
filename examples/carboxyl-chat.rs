@@ -1,7 +1,7 @@
 use carboxyl::{Signal, Sink, Stream};
 
 fn main() {
-    let sink: Sink<String> = Sink::new();    
+    let sink: Sink<String> = Sink::new();
     let name = Signal::new(String::from(""));
     let text = sink.stream();
     // what does move do here? how does carboxyl do async?

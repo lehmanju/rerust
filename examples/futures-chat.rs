@@ -1,8 +1,11 @@
-use futures::{executor, future, pin_mut, stream, stream::Peekable, FutureExt, StreamExt};
-use futures_signals::{map_ref, signal::{Mutable, SignalExt}};
-use std::pin::Pin;
-use future::ready;
 use executor::ThreadPool;
+use future::ready;
+use futures::{executor, future, pin_mut, stream, stream::Peekable, FutureExt, StreamExt};
+use futures_signals::{
+    map_ref,
+    signal::{Mutable, SignalExt},
+};
+use std::pin::Pin;
 
 fn main() {
     let x_mut = Mutable::new(1);

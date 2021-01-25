@@ -34,7 +34,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         let incoming = &get_incoming_idents(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
         tks_change.extend(weight.gen_change());
-        let tks_if = weight.gen_source(&incoming);        
+        let tks_if = weight.gen_source(&incoming);
         tks_card_structs.extend(tks_if.card_struct);
         tks_slots.extend(tks_if.slot_part);
         tks_sink_fn.extend(tks_if.sink_fn);
@@ -54,6 +54,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_observers.extend(weight.gen_observer());
     }
     quote! {
+        use std::rc::Rc;
         use std::rc::Weak;
         use std::cell::RefCell;
         use std::sync::mpsc::*;
@@ -88,7 +89,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
 
         struct Phantom {}
-        
+
         #tks_card_structs
 
         #[derive(Default)]
@@ -96,7 +97,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             #tks_slots
         }
         impl Slots {
-            fn new() -> Self {
+            fn new(data: Weak<Phantom>) -> Self {
                 Self {
                 #tks_slot_init
                 }
@@ -106,11 +107,12 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         pub struct Sink {
             slots: Slots,
             channel_sender: Sender<Input>,
+            id: Rc<Phantom>,
         }
 
         impl Clone for Sink {
             fn clone(&self) -> Self {
-                Self { slots: Slots::default(), channel_sender: self.channel_sender.clone() }
+                Self { slots: Slots::default(), channel_sender: self.channel_sender.clone(), id: self.id.clone()}
             }
         }
 
@@ -122,18 +124,20 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             }
 
             pub fn send(&mut self, input: Input) {
-                if (#tks_slot_check)
+                if #tks_slot_check
                 {
                     self.channel_sender.send(input);
                 } else
                 {
-                    panic!("Slot empty for one input");
+                    panic!("Slot empty or from another program instance");
                 }
             }
             pub fn new(sender: Sender<Input>) -> Self {
+                let id = Rc::new(Phantom {});
                 Self {
-                    slots: Slots::new(),
+                    slots: Slots::new(Rc::downgrade(&id)),
                     channel_sender: sender,
+                    id,
                 }
             }
         }
@@ -144,7 +148,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 let result = receiver.try_recv();
                 if let Ok(inputs) = result {
                     #tks_update
-                }                
+                }
                 change
             }
 
@@ -168,7 +172,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 }
             }
 
-            pub fn sink(&mut self) -> &mut Sink { 
+            pub fn sink(&mut self) -> &mut Sink {
                 &mut self.sink
             }
 
@@ -197,7 +201,6 @@ fn get_incoming_idents(graph: &Graph<ReNode, ReEdge>, idx: NodeIndex) -> Vec<Ide
     }
     idents
 }
-
 
 #[derive(Default)]
 pub struct InterfaceTokens {
@@ -306,51 +309,58 @@ impl Generate for NameNode<'_> {
         let ty = &self.ty;
         let incoming_node = &incoming[0];
         let mut ift = InterfaceTokens::default();
-        if incoming_node.to_string().starts_with("var") || incoming_node.to_string().starts_with("evt") {
-        let input_fn_name = format_ident!("set_{}", name);
-        ift.input_fn = quote! {
-            pub fn #input_fn_name(&mut self, value: #ty) {
-                self.#incoming_node = Some(value);
-            }
-        };
-        let card_name = format_ident!("Card{}", name);
-        ift.card_struct = quote! {
-            pub struct #card_name {
-                data: Phantom,
+        if incoming_node.to_string().starts_with("var")
+            || incoming_node.to_string().starts_with("evt")
+        {
+            let input_fn_name = format_ident!("set_{}", name);
+            ift.input_fn = quote! {
+                pub fn #input_fn_name(&mut self, value: #ty) {
+                    self.#incoming_node = Some(value);
+                }
+            };
+            let card_name = format_ident!("Card{}", name);
+            ift.card_struct = quote! {
+                pub struct #card_name {
+                    data: Weak<Phantom>,
 
-            }
-        };
-        ift.slot_part = quote! {
-            #name: Option<#card_name>,
-        };
-        ift.slot_init = quote! {
-            #name: Some(#card_name {data: Phantom{}}),
-        };
-        let push_card = format_ident!("push_{}", name);
-        let pull_card = format_ident!("pull_{}", name);
-        let send_single = format_ident!("send_{}", name);
-        ift.sink_fn = quote! {
-            pub fn #push_card(&mut self, card: #card_name) {
-                self.slots.#name = Some(card);
-            }
-            pub fn #pull_card(&mut self) -> Option<#card_name> {
-                self.slots.#name.take()
-            }
-            pub fn #send_single(&mut self, value: #ty) {
-                let mut input = Input::default();
-                input.#input_fn_name(value);
-                self.send(input);
-            }
-        };
-        ift.take_all = quote! {
-            if other.slots.#name.is_some() {
-                mem::swap(&mut self.slots.#name, &mut other.slots.#name);
-            }
-        };
-        ift.check_input = quote! {
-            && (self.slots.#name.is_some() || input.#incoming_node.is_none())
-        };
-    }
+                }
+            };
+            ift.slot_part = quote! {
+                #name: Option<#card_name>,
+            };
+            ift.slot_init = quote! {
+                #name: Some(#card_name {data: data.clone()}),
+            };
+            let push_card = format_ident!("push_{}", name);
+            let pull_card = format_ident!("pull_{}", name);
+            let send_single = format_ident!("send_{}", name);
+            ift.sink_fn = quote! {
+                pub fn #push_card(&mut self, card: #card_name) {
+                    let id_self = Rc::downgrade(&self.id);
+                    if id_self.ptr_eq(&card.data) {
+                        self.slots.#name = Some(card);
+                    } else {
+                        panic!("Card has incorrect id");
+                    }
+                }
+                pub fn #pull_card(&mut self) -> Option<#card_name> {
+                    self.slots.#name.take()
+                }
+                pub fn #send_single(&mut self, value: #ty) {
+                    let mut input = Input::default();
+                    input.#input_fn_name(value);
+                    self.send(input);
+                }
+            };
+            ift.take_all = quote! {
+                if other.slots.#name.is_some() {
+                    mem::swap(&mut self.slots.#name, &mut other.slots.#name);
+                }
+            };
+            ift.check_input = quote! {
+                && (self.slots.#name.is_some() || input.#incoming_node.is_none())
+            };
+        }
         ift
     }
 }

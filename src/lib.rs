@@ -1,9 +1,9 @@
 use analysis::ReVisitor;
 use codegen::generate;
 use parser::ReBlock;
+use petgraph::dot::Dot;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
-use petgraph::dot::Dot;
 
 mod analysis;
 mod codegen;

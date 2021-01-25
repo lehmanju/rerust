@@ -1,10 +1,10 @@
 use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
 mod generated {
     use rerust::rerust_gen;
-    use std::rc::Weak;
     use std::cell::RefCell;
-    use std::sync::mpsc::*;
     use std::mem;
+    use std::rc::Weak;
+    use std::sync::mpsc::*;
     pub struct State {
         var_6: Option<usize>,
         var_5: Option<Vec<String>>,
@@ -586,6 +586,4 @@ mod generated {
     }
 }
 
-fn main() {
-    
-}
+fn main() {}
