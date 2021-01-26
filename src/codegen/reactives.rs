@@ -34,6 +34,8 @@ impl Generate for MapNode<'_> {
                         change.#name = true;
                         state.#name = Some(result);
                     }
+                } else if state.#incoming_node.is_none() {
+                    state.#name = None;
                 }
             },
             quote! {
@@ -206,6 +208,8 @@ impl Generate for FilterNode<'_> {
                         change.#name = true;
                         state.#name = Some(val);
                     }
+                } else if state.#incoming_node.is_none() {
+                    state.#name = None;
                 }
             },
             quote! {
@@ -248,6 +252,8 @@ impl Generate for ChoiceNode {
                 } else if change.#b {
                     state.#name = state.#b.clone();
                     change.#name = true;
+                } else if state.#a.is_none() || state.#b.is_none() {
+                    state.#name = None;
                 }
             },
             quote! {

@@ -126,7 +126,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             pub fn send(&mut self, input: Input) {
                 if #tks_slot_check
                 {
-                    self.channel_sender.send(input);
+                    self.channel_sender.send(input).unwrap();
                 } else
                 {
                     panic!("Slot empty or from another program instance");
@@ -146,8 +146,13 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             fn update(state: &mut State, receiver: &mut Receiver<Input>) -> Change {
                 let mut change = Change::default();
                 let result = receiver.try_recv();
-                if let Ok(inputs) = result {
-                    #tks_update
+                match result {
+                    Ok(inputs) => {
+                        #tks_update
+                    }
+                    Err(recv_error) => {
+                        println!("Queue error: {:?}", recv_error);
+                    }
                 }
                 change
             }

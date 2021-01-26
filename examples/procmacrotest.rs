@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
+use std::{cell::RefCell, rc::Rc};
 
 mod generated {
     use rerust::rerust_gen;
