@@ -13,8 +13,7 @@ mod generated {
 
 fn main() {
     let mut prog = generated::Program::new();
-    let mut sink = prog.sink().clone();
-    sink.take_all(prog.sink());
+    let mut sink = prog.sink();
 
     let observer = Rc::new(RefCell::new(observer_cb)) as Rc<_>;
     prog.observe_t(Rc::downgrade(&observer));
