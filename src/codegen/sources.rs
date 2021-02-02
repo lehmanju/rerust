@@ -32,13 +32,12 @@ impl Generate for VarNode<'_> {
     fn gen_state(&self) -> (TokenStream, TokenStream) {
         let ident = self.ident();
         let ty = &self.ty;
-        let init = self.initial;
         (
             quote! {
                 #ident: Option<#ty>,
             },
             quote! {
-                #ident: Some(#init),
+                #ident: None,
             },
         )
     }
@@ -51,6 +50,14 @@ impl Generate for VarNode<'_> {
         let mut ift = InterfaceTokens::default();
         ift.input_struct_part = self.gen_state().0;
         ift
+    }
+
+    fn gen_initial_input(&self) -> TokenStream {
+        let ident = self.ident();
+        let init = self.initial;
+        quote! {
+            #ident: Some(#init),
+        }
     }
 }
 
@@ -100,5 +107,12 @@ impl Generate for EvtNode<'_> {
 
     fn ident(&self) -> Ident {
         format_ident!("evt_{}", self.id)
+    }
+
+    fn gen_initial_input(&self) -> TokenStream {
+        let ident = self.ident();
+        quote! {
+            #ident: None,
+        }
     }
 }

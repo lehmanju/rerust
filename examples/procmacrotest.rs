@@ -17,9 +17,7 @@ mod generated {
 
 fn main() {
     let mut prog = generated::Program::new();
-    let mut sink = prog.sink().clone();
-    sink.take_all(prog.sink());
-    //let text_card = sink.pull_text();
+    let mut sink = prog.sink();
 
     let observer = Rc::new(RefCell::new(observer_cb)) as Rc<_>;
     prog.observe_selected_room(Rc::downgrade(&observer));
@@ -30,7 +28,7 @@ fn main() {
     sink.send_name(format!("Bob"));
     sink.send_text(format!("Hi Alice, nice to meet you!"));
     sink.send_index(1);
-    for _ in 0..5 {
+    for _ in 0..6 {
         prog.run();
     }
 }

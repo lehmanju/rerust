@@ -30,6 +30,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_slot_check = quote! {true};
     let mut tks_take_all = TokenStream::new();
     let mut tks_slot_init = TokenStream::new();
+    let mut tks_initial_input = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_idents(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
@@ -52,6 +53,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_update_return.extend(update_return);
         tks_notify.extend(weight.gen_notify(incoming));
         tks_observers.extend(weight.gen_observer());
+        tks_initial_input.extend(weight.gen_initial_input());
     }
     quote! {
         use std::rc::Rc;
@@ -169,6 +171,10 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
             pub fn new() -> Self {
                 let (send,recv) = channel();
+                let input = Input {
+                    #tks_initial_input
+                };
+                send.send(input).unwrap();
                 Self {
                     state: State::default(),
                     observers: Observers::default(),
@@ -177,8 +183,10 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 }
             }
 
-            pub fn sink(&mut self) -> &mut Sink {
-                &mut self.sink
+            pub fn sink(&mut self) -> Sink {
+                let mut new_sink = self.sink.clone();
+                new_sink.take_all(&mut self.sink);
+                new_sink
             }
 
             #tks_function
@@ -253,6 +261,9 @@ pub trait Generate {
         TokenStream::new()
     }
     fn ident(&self) -> Ident;
+    fn gen_initial_input(&self) -> TokenStream {
+        TokenStream::new()
+    }
 }
 
 impl Generate for NameNode<'_> {
