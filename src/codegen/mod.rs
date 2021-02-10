@@ -63,11 +63,11 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::mem;
 
         #[derive(Clone)]
-        struct State {
+        pub struct State {
             #tks_state
         }
         #[derive(Default)]
-        struct Change {
+        pub struct Change {
             #tks_change
         }
         #[derive(Default)]
@@ -81,12 +81,17 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             sink: Sink,
         }
 
-        #[derive(Default)]
+        #[derive(Default, Clone)]
         pub struct Input {
             #tks_input_struct
         }
 
         impl Input {
+			pub fn initial() -> Self {
+				Self {
+                    #tks_initial_input
+                }
+			}
             #tks_input_fn
         }
 
@@ -145,17 +150,9 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
 
         impl Program {
-            fn update(state: &mut State, receiver: &mut Receiver<Input>) -> Change {
+            pub fn update(state: &mut State, inputs: Input) -> Change {
                 let mut change = Change::default();
-                let result = receiver.try_recv();
-                match result {
-                    Ok(inputs) => {
-                        #tks_update
-                    }
-                    Err(recv_error) => {
-                        println!("Queue error: {:?}", recv_error);
-                    }
-                }
+                #tks_update
                 change
             }
 
@@ -165,15 +162,21 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
             pub fn run(&mut self) {
                 let Program {state, observers, receiver, sink} = self;
-                let changes = Self::update(state, receiver);
-                Self::notify(observers, changes, state);
-            }
+				let result = receiver.try_recv();
+                match result {
+                    Ok(inputs) => {
+						let changes = Self::update(state, inputs);
+						Self::notify(observers, changes, state);
+                    }
+                    Err(recv_error) => {
+                        println!("Queue error: {:?}", recv_error);
+                    }
+                }
+			}
 
             pub fn new() -> Self {
                 let (send,recv) = channel();
-                let input = Input {
-                    #tks_initial_input
-                };
+                let input = Input::initial();
                 send.send(input).unwrap();
                 Self {
                     state: State::default(),
