@@ -63,15 +63,15 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::mem;
 
         #[derive(Clone)]
-        pub struct State {
+        struct State {
             #tks_state
         }
         #[derive(Default)]
-        pub struct Change {
+        struct Change {
             #tks_change
         }
         #[derive(Default)]
-        pub struct Observers {
+        struct Observers {
             #tks_observers
         }
         pub struct Program {
@@ -134,7 +134,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                     panic!("Slot empty or from another program instance");
                 }
             }
-            pub fn new(sender: Sender<Input>) -> Self {
+            fn new(sender: Sender<Input>) -> Self {
                 let id = Rc::new(Phantom {});
                 Self {
                     slots: Slots::new(Rc::downgrade(&id)),
