@@ -25,3 +25,6 @@ harness = false
 
 [lib]
 proc-macro = true
+
+[profile.release]
+debug=1
