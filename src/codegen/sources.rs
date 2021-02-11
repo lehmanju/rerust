@@ -18,10 +18,10 @@ impl Generate for VarNode<'_> {
         let name = self.ident();
         (
             quote! {
-                    if inputs.#name.is_some() {
-                        state.#name = inputs.#name;
-                        change.#name = true;
-                    }
+                if inputs.#name.is_some() {
+                    mem::swap(&mut state.#name, &mut inputs.#name);
+                    change.#name = true;
+                }
             },
             quote! {
                 #name,
@@ -73,12 +73,8 @@ impl Generate for EvtNode<'_> {
         let name = self.ident();
         (
             quote! {
-                if inputs.#name.is_some() {
-                    state.#name = inputs.#name;
-                    change.#name = true;
-                } else {
-                    state.#name = None;
-                }
+                mem::swap(&mut state.#name, &mut inputs.#name);
+                change.#name = state.#name.is_some();
             },
             quote! {
                 #name,

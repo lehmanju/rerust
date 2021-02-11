@@ -150,10 +150,8 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
 
         impl Program {
-            pub fn update(state: &mut State, inputs: Input) -> Change {
-                let mut change = Change::default();
+            pub fn update(state: &mut State, mut inputs: Input, change: &mut Change) {
                 #tks_update
-                change
             }
 
             fn notify(observers: &mut Observers, changes: Change, state: &State) {
@@ -165,7 +163,8 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 let result = receiver.try_recv();
                 match result {
                     Ok(inputs) => {
-                        let changes = Self::update(state, inputs);
+                        let mut changes = Change::default();
+                        Self::update(state, inputs, &mut changes);
                         Self::notify(observers, changes, state);
                     }
                     Err(recv_error) => {
