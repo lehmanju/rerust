@@ -87,11 +87,11 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
 
         impl Input {
-			pub fn initial() -> Self {
-				Self {
+            pub fn initial() -> Self {
+                Self {
                     #tks_initial_input
                 }
-			}
+            }
             #tks_input_fn
         }
 
@@ -162,17 +162,17 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
             pub fn run(&mut self) {
                 let Program {state, observers, receiver, sink} = self;
-				let result = receiver.try_recv();
+                let result = receiver.try_recv();
                 match result {
                     Ok(inputs) => {
-						let changes = Self::update(state, inputs);
-						Self::notify(observers, changes, state);
+                        let changes = Self::update(state, inputs);
+                        Self::notify(observers, changes, state);
                     }
                     Err(recv_error) => {
                         println!("Queue error: {:?}", recv_error);
                     }
                 }
-			}
+            }
 
             pub fn new() -> Self {
                 let (send,recv) = channel();
@@ -321,6 +321,10 @@ impl Generate for NameNode<'_> {
 
     fn ident(&self) -> Ident {
         self.id.ident.clone()
+    }
+
+    fn gen_change(&self) -> TokenStream {
+        TokenStream::new()
     }
 
     fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
