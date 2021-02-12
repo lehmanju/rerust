@@ -1,4 +1,4 @@
- use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
 
