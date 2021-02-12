@@ -1,4 +1,4 @@
-use proc_macro2::{Ident, TokenStream};
+ use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
 
@@ -28,8 +28,7 @@ impl Generate for MapNode<'_> {
         (
             quote! {
                 if change.#incoming_node {
-                    let val = state.#incoming_node.clone().unwrap();
-                    let result = Self::#name(val);
+                    let result = Self::#name(state.#incoming_node.as_ref().unwrap());
                     if state.#name.is_none() || result != *state.#name.as_ref().unwrap() {
                         change.#name = true;
                         state.#name = Some(result);
@@ -69,7 +68,7 @@ impl Generate for FoldNode<'_> {
         let return_type = &self.update_expr.return_type;
         let body = &self.update_expr.body;
         quote! {
-            #[inline]
+            #[inline(always)]
             fn #name (#args) -> #return_type
                 #body
 
@@ -82,7 +81,7 @@ impl Generate for FoldNode<'_> {
         (
             quote! {
                 if change.#incoming_node {
-                    let val = state.#incoming_node.clone().unwrap();
+                    let val = state.#incoming_node.as_ref().unwrap();
                     let result = Self::#name(state.#name.clone().unwrap(), val);
                     if result != *state.#name.as_ref().unwrap() {
                         change.#name = true;
@@ -203,10 +202,10 @@ impl Generate for FilterNode<'_> {
         (
             quote! {
                 if change.#incoming_node {
-                    let val = #incoming_node.clone().unwrap();
-                    if Self::#name(&val) {
+                    let val = #incoming_node.as_ref().unwrap();
+                    if Self::#name(val) {
                         change.#name = true;
-                        state.#name = Some(val);
+                        state.#name = Some(val.clone());
                     }
                 } else if state.#incoming_node.is_none() {
                     state.#name = None;

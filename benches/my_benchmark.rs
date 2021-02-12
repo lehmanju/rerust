@@ -5,30 +5,30 @@ mod natgraph {
     rerust_gen! {
         let source = Var::<i32>(0i32);
         let c1 = source;
-        let b1 = source.map(|v: i32| -> i32 { v + 1 });
-        let b2 = b1.map(|v: i32| -> i32 { v + 1 });
-        let b3 = b2.map(|v: i32| -> i32 { v + 1 });
-        let c2 = b3.map(|v: i32| -> i32 { v + 1 });
-        let c3 = c2.map(|v: i32| -> i32 { 0 });
-        let c4 = c3.map(|v: i32| -> i32 { v + 1 });
-        let a1 = b2.map(|v: i32| -> i32 { v + 1 });
-        let a2 = a1.map(|v: i32| -> i32 { v + 1 });
-        let a3 = (a2,b2).map(|(a,b) : (i32,i32)| -> i32 { a + b });
-        let a4 = a3.map(|v: i32| -> i32 { v + 1 });
-        let b4 = (a4,b3).map(|(a,b) : (i32,i32)| -> i32 { 0 });
-        let b5 = b4.map(|v: i32| -> i32 { v + 1 });
-        let b6 = b5.map(|v: i32| -> i32 { v + 1 });
-        let b7 = b6.map(|v: i32| -> i32 { v + 1 });
-        let b8 = (b7,c2).map(|(a,b) : (i32,i32)| -> i32 { a + b });
-        let c5 = (c4,b8).map(|(a,b) : (i32,i32)| -> i32 { a + b });
-        let d1 = c2.map(|v: i32| -> i32 { v + 1 });
-        let e1 = c1.map(|v: i32| -> i32 { 0 });
-        let e2 = e1.map(|v: i32| -> i32 { v + 1 });
-        let e3 = e2.map(|v: i32| -> i32 { v + 1 });
-        let e4 = e3.map(|v: i32| -> i32 { v + 1 });
-        let e5 = (e4,c2).map(|(a,b) : (i32,i32)| -> i32 { a + b });
-        let e6 = c2.map(|v: i32| -> i32 { v + 1 });
-        let e7 = (e6,d1).map(|(a,b) : (i32,i32)| -> i32 { a + b });
+        let b1 = source.map(|v: &i32| -> i32 { v + 1 });
+        let b2 = b1.map(|v: &i32| -> i32 { v + 1 });
+        let b3 = b2.map(|v: &i32| -> i32 { v + 1 });
+        let c2 = b3.map(|v: &i32| -> i32 { v + 1 });
+        let c3 = c2.map(|v: &i32| -> i32 { 0 });
+        let c4 = c3.map(|v: &i32| -> i32 { v + 1 });
+        let a1 = b2.map(|v: &i32| -> i32 { v + 1 });
+        let a2 = a1.map(|v: &i32| -> i32 { v + 1 });
+        let a3 = (a2,b2).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let a4 = a3.map(|v: &i32| -> i32 { v + 1 });
+        let b4 = (a4,b3).map(|(a,b) : &(i32,i32)| -> i32 { 0 });
+        let b5 = b4.map(|v: &i32| -> i32 { v + 1 });
+        let b6 = b5.map(|v: &i32| -> i32 { v + 1 });
+        let b7 = b6.map(|v: &i32| -> i32 { v + 1 });
+        let b8 = (b7,c2).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let c5 = (c4,b8).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let d1 = c2.map(|v: &i32| -> i32 { v + 1 });
+        let e1 = c1.map(|v: &i32| -> i32 { 0 });
+        let e2 = e1.map(|v: &i32| -> i32 { v + 1 });
+        let e3 = e2.map(|v: &i32| -> i32 { v + 1 });
+        let e4 = e3.map(|v: &i32| -> i32 { v + 1 });
+        let e5 = (e4,c2).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let e6 = c2.map(|v: &i32| -> i32 { v + 1 });
+        let e7 = (e6,d1).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
     }
 }
 
@@ -97,21 +97,33 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
         let source = value;
         change.source = true;
         state.source = source;
+	}
+	if change.source {
         let c1 = state.source;
         change.c1 = true;
         state.c1 = c1;
+	}
+	if change.source {
         let b1 = state.source + 1;
         change.b1 = true;
         state.b1 = b1;
+	}
+	if change.source {
         let b2 = state.source + 1;
         change.b2 = true;
         state.b2 = b2;
+	}
+	if change.b2 {
         let b3 = state.b2 + 1;
         change.b3 = true;
         state.b3 = b3;
+	}
+	if change.b3 {
         let c2 = state.b3 + 1;
         change.c2 = true;
         state.c2 = c2;
+	}
+	if change.c2 {
         let c3 = state.c2 - state.c2;
         if state.c3 != c3 {
             change.c3 = true;
@@ -120,12 +132,18 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
             change.c4 = true;
             state.c4 = c4;
         }
+	}
+	if change.b2 {
         let a1 = state.b2 + 1;
         change.a1 = true;
         state.a1 = a1;
+	}
+	if change.a1 {
         let a2 = state.a1 + 1;
         change.a2 = true;
         state.a2 = a2;
+	}
+	if change.a2 && change.b2 {
         let a3 = state.a2 + state.b2;
         if a3 != state.a3 {
             change.a3 = true;
@@ -134,7 +152,9 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
             change.a4 = true;
             state.a4 = a4;
         }
-        let b4 = state.a4 + b3;
+	}
+	if change.a4 && change.b3 {
+        let b4 = state.a4 + state.b3;
         if b4 != state.b4 {
             change.b4 = true;
             state.b4 = b4;
@@ -148,7 +168,7 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
             change.b7 = true;
             state.b7 = b7;
         }
-        let b8 = state.b7 + c2;
+        let b8 = state.b7 + state.c2;
         if b8 != state.b8 {
             change.b8 = true;
             state.b8 = b8;
@@ -175,7 +195,7 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
             change.e4 = true;
             state.e4 = e4;
         }
-        let e5 = state.e4 + c2;
+        let e5 = state.e4 + state.c2;
         if e5 != state.e5 {
             change.e5 = true;
             state.e5 = e5;
