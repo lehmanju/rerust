@@ -34,32 +34,32 @@ mod natgraph {
 
 #[derive(Default, Clone)]
 struct State {
-    source: i32,
-    c1: i32,
-    b1: i32,
-    b2: i32,
-    b3: i32,
-    c2: i32,
-    c3: i32,
-    c4: i32,
-    a1: i32,
-    a2: i32,
-    a3: i32,
-    a4: i32,
-    b4: i32,
-    b5: i32,
-    b6: i32,
-    b7: i32,
-    b8: i32,
-    c5: i32,
-    d1: i32,
-    e1: i32,
-    e2: i32,
-    e3: i32,
-    e4: i32,
-    e5: i32,
-    e6: i32,
-    e7: i32,
+    source: Option<i32>,
+    c1: Option<i32>,
+    b1: Option<i32>,
+    b2: Option<i32>,
+    b3: Option<i32>,
+    c2: Option<i32>,
+    c3: Option<i32>,
+    c4: Option<i32>,
+    a1: Option<i32>,
+    a2: Option<i32>,
+    a3: Option<i32>,
+    a4: Option<i32>,
+    b4: Option<i32>,
+    b5: Option<i32>,
+    b6: Option<i32>,
+    b7: Option<i32>,
+    b8: Option<i32>,
+    c5: Option<i32>,
+    d1: Option<i32>,
+    e1: Option<i32>,
+    e2: Option<i32>,
+    e3: Option<i32>,
+    e4: Option<i32>,
+    e5: Option<i32>,
+    e6: Option<i32>,
+    e7: Option<i32>,
 }
 
 #[derive(Default, Clone)]
@@ -93,120 +93,150 @@ struct Change {
 }
 
 fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
-    if value != state.source {
+    if state.source.is_none() || value != *state.source.as_ref().unwrap() {
         let source = value;
         change.source = true;
-        state.source = source;
-	}
-	if change.source {
+        state.source = Some(source);
+    }
+    if change.source {
         let c1 = state.source;
         change.c1 = true;
         state.c1 = c1;
-	}
-	if change.source {
-        let b1 = state.source + 1;
+    }
+    if change.source {
+        let b1 = *state.source.as_ref().unwrap() + 1;
         change.b1 = true;
-        state.b1 = b1;
-	}
-	if change.source {
-        let b2 = state.source + 1;
+        state.b1 = Some(b1);
+    }
+    if change.source {
+        let b2 = *state.source.as_ref().unwrap() + 1;
         change.b2 = true;
-        state.b2 = b2;
-	}
-	if change.b2 {
-        let b3 = state.b2 + 1;
+        state.b2 = Some(b2);
+    }
+    if change.b2 {
+        let b3 = *state.b2.as_ref().unwrap() + 1;
         change.b3 = true;
-        state.b3 = b3;
-	}
-	if change.b3 {
-        let c2 = state.b3 + 1;
+        state.b3 = Some(b3);
+    }
+    if change.b3 {
+        let c2 = *state.b3.as_ref().unwrap() + 1;
         change.c2 = true;
-        state.c2 = c2;
-	}
-	if change.c2 {
-        let c3 = state.c2 - state.c2;
-        if state.c3 != c3 {
+        state.c2 = Some(c2);
+    }
+    if change.c2 {
+        let c3 = *state.c2.as_ref().unwrap() - *state.c2.as_ref().unwrap();
+        if state.c3.is_none() || *state.c3.as_ref().unwrap() != c3 {
             change.c3 = true;
-            state.c3 = c3;
-            let c4 = state.c3 + 1;
-            change.c4 = true;
-            state.c4 = c4;
+            state.c3 = Some(c3);
         }
-	}
-	if change.b2 {
-        let a1 = state.b2 + 1;
+    }
+    if change.c3 {
+        let c4 = *state.c3.as_ref().unwrap() + 1;
+        change.c4 = true;
+        state.c4 = Some(c4);
+    }
+    if change.b2 {
+        let a1 = *state.b2.as_ref().unwrap() + 1;
         change.a1 = true;
-        state.a1 = a1;
-	}
-	if change.a1 {
-        let a2 = state.a1 + 1;
+        state.a1 = Some(a1);
+    }
+    if change.a1 {
+        let a2 = *state.a1.as_ref().unwrap() + 1;
         change.a2 = true;
-        state.a2 = a2;
-	}
-	if change.a2 && change.b2 {
-        let a3 = state.a2 + state.b2;
-        if a3 != state.a3 {
+        state.a2 = Some(a2);
+    }
+    if change.a2 || change.b2 {
+        let a3 = *state.a2.as_ref().unwrap() + *state.b2.as_ref().unwrap();
+        if state.a3.is_none() || a3 != *state.a3.as_ref().unwrap() {
             change.a3 = true;
-            state.a3 = a3;
-            let a4 = state.a3 + 1;
-            change.a4 = true;
-            state.a4 = a4;
+            state.a3 = Some(a3);
         }
-	}
-	if change.a4 && change.b3 {
-        let b4 = state.a4 + state.b3;
-        if b4 != state.b4 {
+    }
+    if change.a3 {
+        let a4 = *state.a3.as_ref().unwrap() + 1;
+        change.a4 = true;
+        state.a4 = Some(a4);
+    }
+    if change.a4 || change.b3 {
+        let b4 = *state.a4.as_ref().unwrap() + *state.b3.as_ref().unwrap();
+        if state.b4.is_none() || b4 != *state.b4.as_ref().unwrap() {
             change.b4 = true;
-            state.b4 = b4;
-            let b5 = state.b4 + 1;
-            change.b5 = true;
-            state.b5 = b5;
-            let b6 = state.b5 + 1;
-            change.b6 = true;
-            state.b6 = b6;
-            let b7 = state.b6 + 1;
-            change.b7 = true;
-            state.b7 = b7;
+            state.b4 = Some(b4);
         }
-        let b8 = state.b7 + state.c2;
-        if b8 != state.b8 {
+    }
+    if change.b4 {
+        let b5 = *state.b4.as_ref().unwrap() + 1;
+        change.b5 = true;
+        state.b5 = Some(b5);
+    }
+    if change.b5 {
+        let b6 = *state.b5.as_ref().unwrap() + 1;
+        change.b6 = true;
+        state.b6 = Some(b6);
+    }
+    if change.b6 {
+        let b7 = *state.b6.as_ref().unwrap() + 1;
+        change.b7 = true;
+        state.b7 = Some(b7);
+    }
+    if change.b7 || change.c2 {
+        let b8 = *state.b7.as_ref().unwrap() + *state.c2.as_ref().unwrap();
+        if state.b8.is_none() || b8 != *state.b8.as_ref().unwrap() {
             change.b8 = true;
-            state.b8 = b8;
+            state.b8 = Some(b8);
         }
-        let c5 = state.c4 + b8;
-        if c5 != state.c5 {
+    }
+    if change.c4 || change.b8 {
+        let c5 = *state.c4.as_ref().unwrap() + *state.b8.as_ref().unwrap();
+        if state.c5.is_none() || c5 != *state.c5.as_ref().unwrap() {
             change.c5 = true;
-            state.c5 = c5;
+            state.c5 = Some(c5);
         }
-        let d1 = state.c2 + 1;
+    }
+    if change.c2 {
+        let d1 = *state.c2.as_ref().unwrap() + 1;
         change.d1 = true;
-        state.d1 = d1;
-        let e1 = state.c1 - state.c1;
-        if state.e1 != e1 {
+        state.d1 = Some(d1);
+    }
+    if change.c1 {
+        let e1 = *state.c1.as_ref().unwrap() - *state.c1.as_ref().unwrap();
+        if state.e1.is_none() || *state.e1.as_ref().unwrap() != e1 {
             change.e1 = true;
-            state.e1 = e1;
-            let e2 = state.e1 + 1;
-            change.e2 = true;
-            state.e2 = e2;
-            let e3 = state.e2 + 1;
-            change.e3 = true;
-            state.e3 = e3;
-            let e4 = state.e3 + 1;
-            change.e4 = true;
-            state.e4 = e4;
+            state.e1 = Some(e1);
         }
-        let e5 = state.e4 + state.c2;
-        if e5 != state.e5 {
+    }
+    if change.e1 {
+        let e2 = *state.e1.as_ref().unwrap() + 1;
+        change.e2 = true;
+        state.e2 = Some(e2);
+    }
+    if change.e2 {
+        let e3 = *state.e2.as_ref().unwrap() + 1;
+        change.e3 = true;
+        state.e3 = Some(e3);
+    }
+    if change.e3 {
+        let e4 = *state.e3.as_ref().unwrap() + 1;
+        change.e4 = true;
+        state.e4 = Some(e4);
+    }
+    if change.e4 {
+        let e5 = *state.e4.as_ref().unwrap() + *state.c2.as_ref().unwrap();
+        if state.e5.is_none() || e5 != *state.e5.as_ref().unwrap() {
             change.e5 = true;
-            state.e5 = e5;
+            state.e5 = Some(e5);
         }
-        let e6 = state.c2 + 1;
+    }
+    if change.c2 {
+        let e6 = *state.c2.as_ref().unwrap() + 1;
         change.e6 = true;
-        state.e6 = e6;
-        let e7 = state.e6 + state.d1;
-        if e7 != state.e7 {
+        state.e6 = Some(e6);
+    }
+    if change.e6 || change.d1 {
+        let e7 = *state.e6.as_ref().unwrap() + *state.d1.as_ref().unwrap();
+        if state.e7.is_none() || e7 != *state.e7.as_ref().unwrap() {
             change.e7 = true;
-            state.e7 = e7;
+            state.e7 = Some(e7);
         }
     }
 }
