@@ -4,9 +4,8 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::analysis::{
-    ChoiceNode, EvtNode, FilterNode, FoldNode, GroupNode, NameNode, ReEdge, VarNode,
+    ChoiceNode, EvtNode, FilterNode, FoldNode, GroupNode, NameNode, ReEdge, VarNode, MapNode, ReNode, Family,
 };
-use crate::analysis::{MapNode, ReNode};
 use petgraph::{graph::NodeIndex, visit::Topo, Graph};
 
 mod reactives;
@@ -32,28 +31,25 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_slot_init = TokenStream::new();
     let mut tks_initial_input = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
-        let incoming = &get_incoming_idents(graph, nodeidx);
+        let incoming = &get_incoming_weights(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
-        tks_change.extend(weight.gen_change());
-        let tks_if = weight.gen_source(&incoming);
-        tks_card_structs.extend(tks_if.card_struct);
-        tks_slots.extend(tks_if.slot_part);
-        tks_sink_fn.extend(tks_if.sink_fn);
-        tks_input_fn.extend(tks_if.input_fn);
-        tks_take_all.extend(tks_if.take_all);
-        tks_slot_check.extend(tks_if.check_input);
-        tks_slot_init.extend(tks_if.slot_init);
-        let (state_members, state_default) = weight.gen_state();
-        tks_state.extend(state_members);
-        tks_input_struct.extend(tks_if.input_struct_part);
-        tks_default_state.extend(state_default);
-        tks_function.extend(weight.gen_function(incoming));
-        let (update, update_return) = weight.gen_update(incoming);
-        tks_update.extend(update);
-        tks_update_return.extend(update_return);
-        tks_notify.extend(weight.gen_notify(incoming));
-        tks_observers.extend(weight.gen_observer());
-        tks_initial_input.extend(weight.gen_initial_input());
+		let tokens = weight.generate_interface(incoming);
+        tks_change.extend(tokens.change_struct);
+        tks_card_structs.extend(tokens.card_struct);
+        tks_slots.extend(tokens.slot_part);
+        tks_sink_fn.extend(tokens.sink_fn);
+        tks_input_fn.extend(tokens.input_fn);
+        tks_take_all.extend(tokens.take_all);
+        tks_slot_check.extend(tokens.check_input);
+        tks_slot_init.extend(tokens.slot_init);
+        tks_state.extend(tokens.state_struct);
+        tks_input_struct.extend(tokens.input_struct_part);
+        tks_default_state.extend(tokens.state_default);
+        tks_function.extend(tokens.functions);
+        tks_update.extend(tokens.update_part);
+        tks_notify.extend(tokens.notify_part);
+        tks_observers.extend(tokens.observer_struct);
+        tks_initial_input.extend(tokens.initial_input);
     }
     quote! {
         use std::rc::Rc;
@@ -129,7 +125,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             pub fn take_all(&mut self, other: &mut Self) {
                 #tks_take_all
             }
-
+			
             pub fn send(&mut self, input: Input) {
                 if #tks_slot_check
                 {
@@ -203,105 +199,49 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
     }
 }
-fn get_incoming_idents(graph: &Graph<ReNode, ReEdge>, idx: NodeIndex) -> Vec<Ident> {
+fn get_incoming_weights<'ast>(graph: &'ast Graph<ReNode<'ast>, ReEdge>, idx: NodeIndex) -> Vec<&'ast ReNode> {
     let incoming_nodes = graph.neighbors_directed(idx, petgraph::Incoming);
-    let mut idents = Vec::new();
+    let mut weights = Vec::new();
     for node_idx in incoming_nodes {
         let node = graph.node_weight(node_idx).expect("invalid node index");
-        if let ReNode::Name(_) = node {
-            idents.extend(get_incoming_idents(graph, node_idx));
-        } else {
-            idents.push(node.ident());
-        }
+        weights.push(node);
     }
-    idents
+    weights
 }
 
 #[derive(Default)]
 pub struct InterfaceTokens {
-    input_struct_part: TokenStream,
-    card_struct: TokenStream,
-    slot_part: TokenStream,
-    sink_fn: TokenStream,
-    input_fn: TokenStream,
-    check_input: TokenStream,
-    take_all: TokenStream,
-    slot_init: TokenStream,
+    pub input_struct_part: TokenStream,
+    pub card_struct: TokenStream,
+    pub slot_part: TokenStream,
+    pub sink_fn: TokenStream,
+    pub input_fn: TokenStream,
+    pub check_input: TokenStream,
+    pub take_all: TokenStream,
+    pub slot_init: TokenStream,
+	pub initial_input: TokenStream,
+	pub functions: TokenStream,
+	pub update_part: TokenStream,
+	pub state_struct: TokenStream,
+	pub events_struct: TokenStream,
+	pub change_struct: TokenStream,
+	pub observer_struct: TokenStream,
+	pub notify_part: TokenStream,
+	pub state_default: TokenStream,
 }
 
 #[enum_dispatch]
 pub trait Generate {
-    fn gen_function(&self, incoming: &Vec<Ident>) -> TokenStream;
-    fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream);
-    fn gen_update_state(&self) -> TokenStream {
-        let ident = self.ident();
-        let unwrap = self.gen_unwrap();
-        quote! {
-            #ident: #unwrap,
-        }
-    }
-    fn gen_unwrap(&self) -> TokenStream {
-        let name = &self.ident();
-        quote! {
-            #name
-        }
-    }
-    fn gen_state(&self) -> (TokenStream, TokenStream);
-    fn gen_change(&self) -> TokenStream {
-        let ident = self.ident();
-        quote! {
-            #ident: bool,
-        }
-    }
-    fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
-        InterfaceTokens::default()
-    }
-    fn gen_observer(&self) -> TokenStream {
-        TokenStream::new()
-    }
-    fn gen_notify(&self, _incoming: &Vec<Ident>) -> TokenStream {
-        TokenStream::new()
-    }
-    fn ident(&self) -> Ident;
-    fn gen_initial_input(&self) -> TokenStream {
-        TokenStream::new()
-    }
+    fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens;
+	fn ident(&self) -> &Ident;
+	fn family(&self) -> Family;
 }
 
 impl Generate for NameNode<'_> {
-    fn gen_function(&self, incoming: &Vec<Ident>) -> TokenStream {
-        let ident = format_ident!("observe_{}", self.ident());
-        let name = self.ident();
-        let ty = &self.ty;
-        quote! {
-            pub fn #ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
-                self.observers.#name.push(observer);
-            }
-        }
-    }
-
-    fn gen_notify(&self, incoming: &Vec<Ident>) -> TokenStream {
-        let income = &incoming[0];
-        let ident = self.ident();
-        quote! {
-            if changes.#income {
-                observers.#ident.retain(|lst| {
-                    if let Some(cb) = Weak::upgrade(lst) {
-                        if let Some(val) = &state.#income {
-                            (&mut *cb.borrow_mut())(val);
-                            true
-                        } else
-                        {
-                            unreachable!()
-                        }
-                    } else {
-                        false
-                    }
-                });
-            }
-        }
-    }
-
+	fn family(&self) -> Family {
+		self.family
+	}
+	
     fn gen_observer(&self) -> TokenStream {
         let name = self.ident();
         let ty = &self.ty;
@@ -310,79 +250,93 @@ impl Generate for NameNode<'_> {
         }
     }
 
-    fn gen_update(&self, _incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
-        (TokenStream::new(), TokenStream::new())
+    fn ident(&self) -> &Ident {
+        &self.id.ident
     }
-
-    fn gen_state(&self) -> (TokenStream, TokenStream) {
-        (TokenStream::new(), TokenStream::new())
-    }
-
-    fn ident(&self) -> Ident {
-        self.id.ident.clone()
-    }
-
-    fn gen_change(&self) -> TokenStream {
-        TokenStream::new()
-    }
-
-    fn gen_source(&self, incoming: &Vec<Ident>) -> InterfaceTokens {
+    
+    fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
         let name = self.ident();
         let ty = &self.ty;
-        let incoming_node = &incoming[0];
+		let ident = self.ident();
+		let income = incoming[0].ident();
+		let parent_node = incoming[0];
         let mut ift = InterfaceTokens::default();
-        if incoming_node.to_string().starts_with("var")
-            || incoming_node.to_string().starts_with("evt")
+		ift.functions = quote! {
+            pub fn #ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
+                self.observers.#name.push(observer);
+            }
+		};
+		ift.notify_part = quote! {
+			if changes.#income {
+				observers.#ident.retain(|lst| {
+					if let Some(cb) = Weak::upgrade(lst) {
+						if let Some(val) = &state.#income {
+							(&mut *cb.borrow_mut())(val);
+							true
+						} else
+						{
+							unreachable!()
+						}
+					} else {
+						false
+					}
+				});
+			}
+		};
+        match parent_node
         {
-            let input_fn_name = format_ident!("set_{}", name);
-            ift.input_fn = quote! {
-                pub fn #input_fn_name(&mut self, value: #ty) {
-                    self.#incoming_node = Some(value);
-                }
-            };
-            let card_name = format_ident!("Card{}", name);
-            ift.card_struct = quote! {
-                pub struct #card_name {
-                    data: Weak<Phantom>,
+			ReNode::Var(_) | ReNode::Evt(_) => {
+				let input_fn_name = format_ident!("set_{}", name);
+				ift.input_fn = quote! {
+					pub fn #input_fn_name(&mut self, value: #ty) {
+						self.#income = Some(value);
+					}
+				};
+				let card_name = format_ident!("Card{}", name);
+				ift.card_struct = quote! {
+					pub struct #card_name {
+						data: Weak<Phantom>,
 
-                }
-            };
-            ift.slot_part = quote! {
-                #name: Option<#card_name>,
-            };
-            ift.slot_init = quote! {
-                #name: Some(#card_name {data: data.clone()}),
-            };
-            let push_card = format_ident!("push_{}", name);
-            let pull_card = format_ident!("pull_{}", name);
-            let send_single = format_ident!("send_{}", name);
-            ift.sink_fn = quote! {
-                pub fn #push_card(&mut self, card: #card_name) {
-                    let id_self = Rc::downgrade(&self.id);
-                    if id_self.ptr_eq(&card.data) {
-                        self.slots.#name = Some(card);
-                    } else {
-                        panic!("Card has incorrect id");
-                    }
-                }
-                pub fn #pull_card(&mut self) -> Option<#card_name> {
-                    self.slots.#name.take()
-                }
-                pub fn #send_single(&mut self, value: #ty) {
-                    let mut input = Input::default();
-                    input.#input_fn_name(value);
-                    self.send(input);
-                }
-            };
-            ift.take_all = quote! {
-                if other.slots.#name.is_some() {
-                    mem::swap(&mut self.slots.#name, &mut other.slots.#name);
-                }
-            };
-            ift.check_input = quote! {
-                && (self.slots.#name.is_some() || input.#incoming_node.is_none())
-            };
-        }
+					}
+				};
+				ift.slot_part = quote! {
+					#name: Option<#card_name>,
+				};
+				ift.slot_init = quote! {
+					#name: Some(#card_name {data: data.clone()}),
+				};
+				let push_card = format_ident!("push_{}", name);
+				let pull_card = format_ident!("pull_{}", name);
+				let send_single = format_ident!("send_{}", name);
+				ift.sink_fn = quote! {
+					pub fn #push_card(&mut self, card: #card_name) {
+						let id_self = Rc::downgrade(&self.id);
+						if id_self.ptr_eq(&card.data) {
+							self.slots.#name = Some(card);
+						} else {
+							panic!("Card has incorrect id");
+						}
+					}
+					pub fn #pull_card(&mut self) -> Option<#card_name> {
+						self.slots.#name.take()
+					}
+					pub fn #send_single(&mut self, value: #ty) {
+						let mut input = Input::default();
+						input.#input_fn_name(value);
+						self.send(input);
+					}
+				};
+				ift.take_all = quote! {
+					if other.slots.#name.is_some() {
+						mem::swap(&mut self.slots.#name, &mut other.slots.#name);
+					}
+				};
+				ift.check_input = quote! {
+					&& (self.slots.#name.is_some() || input.#income.is_none())
+				};
+			}
+			_ => {}
+		};
         ift
     }
 }

@@ -2,41 +2,47 @@ use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
 
-use crate::analysis::MapNode;
-use crate::analysis::{ChoiceNode, FilterNode, FoldNode, GroupNode};
+use crate::analysis::{ChoiceNode, FilterNode, FoldNode, GroupNode, MapNode, ReNode, Family};
 
-use super::Generate;
+use super::{Generate, InterfaceTokens};
 
 impl Generate for MapNode<'_> {
-    fn gen_function(&self, _: &Vec<Ident>) -> TokenStream {
-        let name = self.ident();
+	fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
+		let mut ift = InterfaceTokens::default();
+		let name = self.ident();
         let args = &self.update_expr.inputs;
         let return_type = &self.update_expr.return_type;
         let body = &self.update_expr.body;
-
-        quote! {
+		ift.functions = quote! {
             #[inline]
             fn #name (#args) -> #return_type
                 #body
 
-        }
+        };
+		let incoming_family = 
+        quote! {
+            if change.#incoming_node {
+                let result = Self::#name(state.#incoming_node.as_ref().unwrap());
+                if state.#name.is_none() || result != *state.#name.as_ref().unwrap() {
+                    change.#name = true;
+                    state.#name = Some(result);
+                }
+            } else if state.#incoming_node.is_none() {
+                state.#name = None;
+            }
+        };
+		ift
+	}
+
+	fn gen_function(&self, _: &Vec<Ident>) -> TokenStream {
+
+        
     }
 
     fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
         let incoming_node = &incoming[0];
         let name = self.ident();
         (
-            quote! {
-                if change.#incoming_node {
-                    let result = Self::#name(state.#incoming_node.as_ref().unwrap());
-                    if state.#name.is_none() || result != *state.#name.as_ref().unwrap() {
-                        change.#name = true;
-                        state.#name = Some(result);
-                    }
-                } else if state.#incoming_node.is_none() {
-                    state.#name = None;
-                }
-            },
             quote! {
                 #name,
             },
@@ -56,8 +62,12 @@ impl Generate for MapNode<'_> {
         )
     }
 
-    fn ident(&self) -> Ident {
-        format_ident!("map_{}", self.id)
+	fn family(&self) -> Family {
+		self.family
+	}
+	
+    fn ident(&self) -> &Ident {
+        &format_ident!("map_{}", self.id)
     }
 }
 
