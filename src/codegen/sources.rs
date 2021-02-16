@@ -41,8 +41,8 @@ impl Generate for  VarNode<'_> {
 		ift
 	}
 	
-    fn ident(&self) -> &Ident {
-        &format_ident!("var_{}", self.id)
+    fn ident(&self) -> Ident {
+        format_ident!("var_{}", self.id)
     }
 }
 
@@ -59,19 +59,13 @@ impl Generate for EvtNode<'_> {
         ift.events_struct = quote! {
             #name: Option<#ty>,
         };
-		ift.input_struct_part = ift.events_struct;
+		ift.input_struct_part = ift.events_struct.clone();
+		ift.initial_input = quote! { #name: None, };
 		ift
 	}
 	
-    fn ident(&self) -> &Ident {
-        &format_ident!("evt_{}", self.id)
-    }
-
-    fn gen_initial_input(&self) -> TokenStream {
-        let ident = self.ident();
-        quote! {
-            #ident: None,
-        }
+    fn ident(&self) -> Ident {
+        format_ident!("evt_{}", self.id)
     }
 
     fn family(&self) -> Family {

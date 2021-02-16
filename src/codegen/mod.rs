@@ -238,7 +238,7 @@ pub struct InterfaceTokens {
 #[enum_dispatch]
 pub trait Generate {
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens;
-	fn ident(&self) -> &Ident;
+	fn ident(&self) -> Ident;
 	fn family(&self) -> Family;
 }
 
@@ -247,16 +247,8 @@ impl Generate for NameNode<'_> {
 		self.family
 	}
 	
-    fn gen_observer(&self) -> TokenStream {
-        let name = self.ident();
-        let ty = &self.ty;
-        quote! {
-            #name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
-        }
-    }
-
-    fn ident(&self) -> &Ident {
-        &self.id.ident
+    fn ident(&self) -> Ident {
+        self.id.ident.clone()
     }
     
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
@@ -266,6 +258,9 @@ impl Generate for NameNode<'_> {
 		let income = incoming[0].ident();
 		let parent_node = incoming[0];
         let mut ift = InterfaceTokens::default();
+		ift.observer_struct = quote! {
+			#name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
+		};
 		ift.functions = quote! {
             pub fn #ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
                 self.observers.#name.push(observer);

@@ -1,0 +1,48 @@
+#![feature(test)]
+
+use analysis::ReVisitor;
+use codegen::generate;
+use parser::ReBlock;
+use petgraph::dot::Dot;
+use proc_macro::TokenStream;
+use syn::parse_macro_input;
+
+extern crate test;
+
+mod analysis;
+mod codegen;
+mod parser;
+
+#[proc_macro]
+pub fn rerust_gen(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ReBlock);
+    println!("{:#?}", input);
+    let mut visitor = ReVisitor::new();
+    let result = visitor.visit_reblock(&input);
+    if result.is_err() {
+        return result.unwrap_err().to_compile_error().into();
+    }
+    let graph = visitor.reactive_graph();
+    //println!("{:#?}", Dot::new(&graph));
+    generate(&graph).into()
+}
+
+#[cfg(test)]
+mod bench {
+	use super::*;
+	use test::{Bencher, black_box};
+
+	mod natgraph {
+		super::rerust_gen! {
+			let val = Var::<u32>(0u32);
+		}
+	}
+	
+	#[bench]
+	fn natural_graph(b: &mut Bencher) {
+		let prog = natgraph::Program::new();
+		b.iter(|| {
+			
+		});
+	}
+}

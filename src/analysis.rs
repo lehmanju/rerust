@@ -37,13 +37,6 @@ pub enum Family {
 }
 
 #[derive(Debug)]
-pub struct GroupNode {
-    pub family: Family,
-    pub ty: Type,
-    pub id: u32,
-}
-
-#[derive(Debug)]
 pub struct ChoiceNode {
     pub family: Family,
     pub ty: Type,
@@ -130,7 +123,11 @@ impl<'ast> ReVisitor<'ast> {
         self.graph.add_edge(last_idx, node_idx, edge);
         Ok(())
     }
-    fn visit_reexpr(&mut self, i: &'ast ReExpr) -> Result<(NodeIndex, Type, Family)> {
+	fn visit_primary(&mut self, i: &'ast RePrimary) -> Result<(NodeIndex, Type, Family)> {
+
+	}
+
+	fn visit_reexpr(&mut self, i: &'ast ReExpr) -> Result<(NodeIndex, Type, Family)> {
         match i {
             ReExpr::Var(varexpr) => {
                 let node = ReNode::Var(VarNode {
@@ -174,16 +171,18 @@ impl<'ast> ReVisitor<'ast> {
                     }
                     incoming_types.push(ty.clone());
                 }
-                let ty = Type::Tuple(TypeTuple {
+				let tuple_ty = TypeTuple {
                     paren_token: Paren {
                         span: Span::call_site(),
                     },
                     elems: incoming_types,
-                });
+                };
+                let ty = Type::Tuple(tuple_ty.clone());
                 let node = ReNode::Group(GroupNode {
                     ty: ty.clone(),
                     id: self.next_idx(),
                     family,
+					tuple_ty,
                 });
                 let idx = self.graph.add_node(node);
                 for (nidx, nty) in incoming_nodes {

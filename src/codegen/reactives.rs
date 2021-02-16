@@ -1,6 +1,7 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
+use syn::{Type, TypeReference};
 
 use crate::analysis::{ChoiceNode, FilterNode, FoldNode, GroupNode, MapNode, ReNode, Family};
 
@@ -71,8 +72,8 @@ impl Generate for MapNode<'_> {
 		ift
 	}
 
-    fn ident(&self) -> &Ident {
-        &format_ident!("map_{}", self.id)
+    fn ident(&self) -> Ident {
+        format_ident!("map_{}", self.id)
     }
 
 	fn family(&self) -> Family {
@@ -81,8 +82,8 @@ impl Generate for MapNode<'_> {
 }
 
 impl Generate for FoldNode<'_> {
-    fn ident(&self) -> &Ident {
-        &format_ident!("fold_{}", self.id)
+    fn ident(&self) -> Ident {
+        format_ident!("fold_{}", self.id)
     }
 
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
@@ -176,7 +177,7 @@ impl Generate for GroupNode {
 		let family = self.family();
 		let name = self.ident();
 		let (compose, condition) = gen_group_update(incoming.clone(), family);
-		let ty = self.ty;
+		let ty = &self.ty;
 		if family == Family::Event {
 			ift.update_part = quote! {
 				let #name = if #condition {
@@ -188,17 +189,53 @@ impl Generate for GroupNode {
 		} else { //if Family::Variable
 			ift.update_part = quote! {
 				let #name = Group { value: (#condition), change: #compose };
+			};
+			let clonetokens = gen_group_ref_clone(incoming.clone());
+			let tuple_ty = &self.tuple_ty.elems;
+			let mut elems = Vec::new();
+			for elem in tuple_ty {
+				elems.push(quote! { &#elem });
 			}
+			let reftokens = gen_group_ref_type(elems);
+			ift.functions = quote! {
+				#[inline]
+				fn #name(val: (#reftokens)) -> #ty {
+					(#clonetokens)
+				}
+			};
 		}
+		
 		ift
 	}
 
-    fn ident(&self) -> &Ident {
-        &format_ident!("group_{}", self.id)
+    fn ident(&self) -> Ident {
+        format_ident!("group_{}", self.id)
     }
 
 	fn family(&self) -> Family {
 		self.family
+	}
+}
+
+fn gen_group_ref_type(mut incoming: Vec<TokenStream>) -> TokenStream {
+	if incoming.len() == 1 {
+		let elem = &incoming[0];
+		quote! { #elem }
+	} else {
+		let elem = incoming.pop().expect("Non empty list");
+		let rest = gen_group_ref_type(incoming);
+		quote! { #elem, #rest }
+	}
+}
+
+fn gen_group_ref_clone(mut incoming: Vec<&ReNode>) -> TokenStream {
+	if incoming.len() == 1 {
+		let elem = &incoming[0].ident();
+		quote! { #elem.clone() }
+	} else {
+		let elem = incoming.pop().expect("Non empty list").ident();
+		let rest = gen_group_ref_clone(incoming);
+		quote! { #elem.clone(), #rest }
 	}
 }
 
@@ -286,7 +323,7 @@ impl Generate for FilterNode<'_> {
 		let incoming_node = incoming[0]; //only one possible incoming node
 		let incoming_family = incoming_node.family();
 		let incoming_name = incoming_node.ident();
-		let ty = self.ty;
+		let ty = &self.ty;
 		if incoming_family == Family::Event {
 			match incoming_node {
 				ReNode::Group(group) => {
@@ -315,22 +352,18 @@ impl Generate for FilterNode<'_> {
 							let choice = Self::#name(#incoming_name.value);
 							if choice {
 								change.#name = true;
-								state.#name = #incoming_name
-							let result = Self::#name(#incoming_name.value);
-							if result != state.#name {
-								change.#name = true;
-								state.#name = result;
+								state.#name = Self::#incoming_name(#incoming_name.value);
 							}
 						}
 					};
 				}
 				_ => {
 					ift.update_part = quote! {
-						if change.#incoming_name {
-							let result = Self::#name(&state.#incoming_name);
-							if result != state.#name {
+						if #incoming_name.change {
+							let choice = Self::#name(&#incoming_name);
+							if choice {
 								change.#name = true;
-								state.#name = result;
+								state.#name = #incoming_name.clone();
 							}
 						}
 					};
@@ -346,98 +379,67 @@ impl Generate for FilterNode<'_> {
 		ift
 	}
 
-
-	fn gen_function(&self, _incoming: &Vec<Ident>) -> TokenStream {
-        let func_name = self.ident();
-        let expr_inputs = &self.filter_expr.inputs;
-        let expr_body = &self.filter_expr.body;
-        quote! {
-            #[inline]
-            fn #func_name(#expr_inputs) -> bool
-                #expr_body
-
-        }
-    }
-
-    fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
-        let name = self.ident();
-        let incoming_node = &incoming[0];
-        (
-            quote! {
-                if change.#incoming_node {
-                    let val = #incoming_node.as_ref().unwrap();
-                    if Self::#name(val) {
-                        change.#name = true;
-                        state.#name = Some(val.clone());
-                    }
-                } else if state.#incoming_node.is_none() {
-                    state.#name = None;
-                }
-            },
-            quote! {
-                #name,
-            },
-        )
-    }
-
-    fn gen_state(&self) -> (TokenStream, TokenStream) {
-        let ident = self.ident();
-        let ty = &self.ty;
-        (
-            quote! {
-                #ident: Option<#ty>,
-            },
-            quote! {
-                #ident: None,
-            },
-        )
-    }
-
+	fn family(&self) -> Family {
+		self.family
+	}
+	
     fn ident(&self) -> Ident {
         format_ident!("filter_{}", self.id)
     }
 }
 
+// impl Generate for ChoiceNode {
+//     fn gen_function(&self, _: &Vec<Ident>) -> TokenStream {
+//         TokenStream::new()
+//     }
+
+//     fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
+//         let name = self.ident();
+//         let (a, b) = (&incoming[0], &incoming[1]);
+//         (
+//             quote! {
+//                 if change.#a {
+//                     state.#name = state.#a.clone();
+//                     change.#name = true;
+//                 } else if change.#b {
+//                     state.#name = state.#b.clone();
+//                     change.#name = true;
+//                 } else if state.#a.is_none() || state.#b.is_none() {
+//                     state.#name = None;
+//                 }
+//             },
+//             quote! {
+//                 #name,
+//             },
+//         )
+//     }
+
+//     fn gen_state(&self) -> (TokenStream, TokenStream) {
+//         let ident = self.ident();
+//         let ty = &self.ty;
+//         (
+//             quote! {
+//                 #ident: Option<#ty>,
+//             },
+//             quote! {
+//                 #ident: None,
+//             },
+//         )
+//     }
+
+//     fn ident(&self) -> Ident {
+//         format_ident!("choice_{}", self.id)
+//     }
+// }
+
 impl Generate for ChoiceNode {
-    fn gen_function(&self, _: &Vec<Ident>) -> TokenStream {
-        TokenStream::new()
-    }
-
-    fn gen_update(&self, incoming: &Vec<Ident>) -> (TokenStream, TokenStream) {
-        let name = self.ident();
-        let (a, b) = (&incoming[0], &incoming[1]);
-        (
-            quote! {
-                if change.#a {
-                    state.#name = state.#a.clone();
-                    change.#name = true;
-                } else if change.#b {
-                    state.#name = state.#b.clone();
-                    change.#name = true;
-                } else if state.#a.is_none() || state.#b.is_none() {
-                    state.#name = None;
-                }
-            },
-            quote! {
-                #name,
-            },
-        )
-    }
-
-    fn gen_state(&self) -> (TokenStream, TokenStream) {
-        let ident = self.ident();
-        let ty = &self.ty;
-        (
-            quote! {
-                #ident: Option<#ty>,
-            },
-            quote! {
-                #ident: None,
-            },
-        )
-    }
-
-    fn ident(&self) -> Ident {
-        format_ident!("choice_{}", self.id)
-    }
+	fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
+		InterfaceTokens::default()
+	}
+	fn ident(&self) -> Ident {
+		format_ident!("choice_{}", self.id)
+	}
+	fn family(&self) -> Family {
+		self.family
+	}
 }
