@@ -17,7 +17,7 @@ pub struct ReLocal {
     pub let_token: Let,
     pub ident: ReIdent,
     pub eq_token: Token![=],
-    pub init: ReExpr,
+    pub init: RePrimary,
     pub semi_token: Semi,
 }
 
@@ -36,6 +36,16 @@ pub enum ReExpr {
     Choice(ChoiceExpr),
     Map(MapExpr),
     Filter(FilterExpr),
+}
+
+#[derive(Debug)]
+pub enum RePrimary {
+	Var(VarExpr),
+	Evt(EvtExpr),
+	Fold(FoldExpr),
+	Choice(ChoiceExpr),
+	Map(MapExpr),
+	Filter(FilterExpr),
 }
 
 #[derive(Debug)]
@@ -161,6 +171,25 @@ impl Parse for ReLocal {
             semi_token: input.parse()?,
         })
     }
+}
+
+impl Parse for RePrimary {
+	fn parse(input: ParseStream) -> syn::Result<Self> {
+		let mut as_reexpr: ReExpr = input.parse()?;
+		match as_reexpr {
+		    ReExpr::Var(var) => {
+				Ok(Self::Var(var))
+			}
+		    ReExpr::Evt(evt) => {Ok(Self::Evt(evt))}
+		   	ReExpr::Fold(fold) => {Ok(Self::Fold(fold))}
+		    ReExpr::Choice(choice) => {Ok(Self::Choice(choice))}
+		    ReExpr::Map(map) => {Ok(Self::Map(map))}
+		    ReExpr::Filter(filter) => {Ok(Self::Filter(filter))}
+			_ => {
+				Err(Error::new(input.span(), "identifiers and signal groups not allowed"))
+			}
+		}
+	}
 }
 
 impl Parse for ReExpr {
