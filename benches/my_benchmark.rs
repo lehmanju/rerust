@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion
 
 mod natgraph {
     use rerust::rerust_gen;
-    rerust_gen! {
+    rerust_gen! { 
         let source = Var::<i32>(0i32);
         let c1 = source;
         let b1 = source.map(|v: &i32| -> i32 { v + 1 });

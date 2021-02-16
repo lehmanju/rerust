@@ -58,6 +58,11 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::sync::mpsc::*;
         use std::mem;
 
+		struct Group<T> {
+			value: T,
+			change: bool,
+		}
+		
         #[derive(Clone)]
         pub struct State {
             #tks_state
