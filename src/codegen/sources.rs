@@ -1,69 +1,73 @@
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::Ident;
 use quote::format_ident;
 use quote::quote;
+use syn::Type;
 
-use crate::analysis::{EvtNode, Family, VarNode, ReNode};
+use crate::analysis::{EvtNode, Family, ReNode, VarNode};
 
 use super::{Generate, InterfaceTokens};
 
-impl Generate for  VarNode<'_> {
-	fn family(&self) -> Family {
-		self.family
-	}
+fn generate_common_source(name: &Ident, fam: Family, ty: &Type) -> InterfaceTokens {
+    let mut ift = InterfaceTokens::default();
+    ift.update_part = quote! {
+        if inputs.#name.is_some() {
+            state.#name = inputs.#name.unwrap();
+            change.#name = true;
+        }
+    };
+    ift.state_struct = quote! {
+        #name: #ty,
+    };
+    ift.input_struct_part = quote! {
+        #name: Option<#ty>,
+    };
+    ift.change_struct = quote! {
+        #name: bool,
+    };
+    ift
+}
 
-	fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
-		let mut ift = InterfaceTokens::default();
-		let name = self.ident();
-		let ty = self.ty;
-		let initial_state = self.initial;
-		ift.update_part = quote! {
-            if inputs.#name.is_some() {
-                mem::swap(&mut state.#name, &mut inputs.#name);
-                change.#name = true;
-            }
+impl Generate for VarNode<'_> {
+    fn family(&self) -> Family {
+        self.family
+    }
+
+    fn generate_interface(&self, _: &Vec<&ReNode>) -> InterfaceTokens {
+        let name = self.ident();
+        let ty = self.ty;
+        let initial_state = self.initial;
+        let mut ift = generate_common_source(&name, Family::Variable, ty);
+
+        ift.state_default = quote! {
+            #name: #initial_state,
         };
-		ift.state_struct = quote! {
-            #name: #ty,
-        }      	;
-		ift.state_default = quote! {
-			#name: #initial_state,
-		};
-		ift.input_struct_part = quote! {
-			#name: Option<#ty>,
-		};
-		let init = self.initial;
+
+        let init = self.initial;
         ift.initial_input = quote! {
             #name: Some(#init),
         };
-		ift.change_struct = quote! {
-			#name: bool,
-		};
-		ift
-	}
-	
+        ift
+    }
+
     fn ident(&self) -> Ident {
         format_ident!("var_{}", self.id)
     }
 }
 
 impl Generate for EvtNode<'_> {
-
-	fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
-		let mut ift = InterfaceTokens::default();
+    fn generate_interface(&self, _: &Vec<&ReNode>) -> InterfaceTokens {
         let name = self.ident();
-        let ty = &self.ty;
-		ift.update_part = quote! {
-            mem::swap(&mut state.#name, &mut inputs.#name);
-            change.#name = state.#name.is_some();
+        let ty = self.ty;
+
+        let mut ift = generate_common_source(&name, Family::Event, ty);
+
+        ift.state_default = quote! {
+            #name: #ty::default(),
         };
-        ift.events_struct = quote! {
-            #name: Option<#ty>,
-        };
-		ift.input_struct_part = ift.events_struct.clone();
-		ift.initial_input = quote! { #name: None, };
-		ift
-	}
-	
+
+        ift
+    }
+
     fn ident(&self) -> Ident {
         format_ident!("evt_{}", self.id)
     }

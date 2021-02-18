@@ -4,7 +4,7 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::analysis::{
-    ChoiceNode, EvtNode, FilterNode, FoldNode, GroupNode, NameNode, ReEdge, VarNode, MapNode, ReNode, Family,
+    ChoiceNode, EvtNode, Family, FilterNode, FoldNode, MapNode, NameNode, ReEdge, ReNode, VarNode,
 };
 use petgraph::{graph::NodeIndex, visit::Topo, Graph};
 
@@ -33,7 +33,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_weights(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
-		let tokens = weight.generate_interface(incoming);
+        let tokens = weight.generate_interface(incoming);
         tks_change.extend(tokens.change_struct);
         tks_card_structs.extend(tokens.card_struct);
         tks_slots.extend(tokens.slot_part);
@@ -58,11 +58,11 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::sync::mpsc::*;
         use std::mem;
 
-		struct Group<T> {
-			value: T,
-			change: bool,
-		}
-		
+        struct Group<T> {
+            value: T,
+            change: bool,
+        }
+
         #[derive(Clone)]
         pub struct State {
             #tks_state
@@ -130,7 +130,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             pub fn take_all(&mut self, other: &mut Self) {
                 #tks_take_all
             }
-			
+
             pub fn send(&mut self, input: Input) {
                 if #tks_slot_check
                 {
@@ -204,7 +204,10 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
     }
 }
-fn get_incoming_weights<'ast>(graph: &'ast Graph<ReNode<'ast>, ReEdge>, idx: NodeIndex) -> Vec<&'ast ReNode> {
+fn get_incoming_weights<'ast>(
+    graph: &'ast Graph<ReNode<'ast>, ReEdge>,
+    idx: NodeIndex,
+) -> Vec<&'ast ReNode> {
     let incoming_nodes = graph.neighbors_directed(idx, petgraph::Incoming);
     let mut weights = Vec::new();
     for node_idx in incoming_nodes {
@@ -224,119 +227,112 @@ pub struct InterfaceTokens {
     pub check_input: TokenStream,
     pub take_all: TokenStream,
     pub slot_init: TokenStream,
-	pub initial_input: TokenStream,
-	pub functions: TokenStream,
-	pub update_part: TokenStream,
-	pub state_struct: TokenStream,
-	pub events_struct: TokenStream,
-	pub change_struct: TokenStream,
-	pub observer_struct: TokenStream,
-	pub notify_part: TokenStream,
-	pub state_default: TokenStream,
+    pub initial_input: TokenStream,
+    pub functions: TokenStream,
+    pub update_part: TokenStream,
+    pub state_struct: TokenStream,
+    pub change_struct: TokenStream,
+    pub observer_struct: TokenStream,
+    pub notify_part: TokenStream,
+    pub state_default: TokenStream,
 }
 
 #[enum_dispatch]
 pub trait Generate {
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens;
-	fn ident(&self) -> Ident;
-	fn family(&self) -> Family;
+    fn ident(&self) -> Ident;
+    fn family(&self) -> Family;
 }
 
 impl Generate for NameNode<'_> {
-	fn family(&self) -> Family {
-		self.family
-	}
-	
+    fn family(&self) -> Family {
+        self.family
+    }
+
     fn ident(&self) -> Ident {
         self.id.ident.clone()
     }
-    
+
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
         let name = self.ident();
         let ty = &self.ty;
-		let ident = self.ident();
-		let income = incoming[0].ident();
-		let parent_node = incoming[0];
+        let ident = self.ident();
+        let income = incoming[0].ident();
+        let parent_node = incoming[0];
         let mut ift = InterfaceTokens::default();
-		ift.observer_struct = quote! {
-			#name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
-		};
-		ift.functions = quote! {
+        ift.observer_struct = quote! {
+            #name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
+        };
+        ift.functions = quote! {
             pub fn #ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
                 self.observers.#name.push(observer);
             }
-		};
-		ift.notify_part = quote! {
-			if changes.#income {
-				observers.#ident.retain(|lst| {
-					if let Some(cb) = Weak::upgrade(lst) {
-						if let Some(val) = &state.#income {
-							(&mut *cb.borrow_mut())(val);
-							true
-						} else
-						{
-							unreachable!()
-						}
-					} else {
-						false
-					}
-				});
-			}
-		};
-        match parent_node
-        {
-			ReNode::Var(_) | ReNode::Evt(_) => {
-				let input_fn_name = format_ident!("set_{}", name);
-				ift.input_fn = quote! {
-					pub fn #input_fn_name(&mut self, value: #ty) {
-						self.#income = Some(value);
-					}
-				};
-				let card_name = format_ident!("Card{}", name);
-				ift.card_struct = quote! {
-					pub struct #card_name {
-						data: Weak<Phantom>,
+        };
+        ift.notify_part = quote! {
+            if changes.#income {
+                observers.#ident.retain(|lst| {
+                    if let Some(cb) = Weak::upgrade(lst) {
+                        (&mut *cb.borrow_mut())(&state.#income);
+                        true
+                    } else {
+                        false
+                    }
+                });
+            }
+        };
+        match parent_node {
+            ReNode::Var(_) | ReNode::Evt(_) => {
+                let input_fn_name = format_ident!("set_{}", name);
+                ift.input_fn = quote! {
+                    pub fn #input_fn_name(&mut self, value: #ty) {
+                        self.#income = Some(value);
+                    }
+                };
+                let card_name = format_ident!("Card{}", name);
+                ift.card_struct = quote! {
+                    pub struct #card_name {
+                        data: Weak<Phantom>,
 
-					}
-				};
-				ift.slot_part = quote! {
-					#name: Option<#card_name>,
-				};
-				ift.slot_init = quote! {
-					#name: Some(#card_name {data: data.clone()}),
-				};
-				let push_card = format_ident!("push_{}", name);
-				let pull_card = format_ident!("pull_{}", name);
-				let send_single = format_ident!("send_{}", name);
-				ift.sink_fn = quote! {
-					pub fn #push_card(&mut self, card: #card_name) {
-						let id_self = Rc::downgrade(&self.id);
-						if id_self.ptr_eq(&card.data) {
-							self.slots.#name = Some(card);
-						} else {
-							panic!("Card has incorrect id");
-						}
-					}
-					pub fn #pull_card(&mut self) -> Option<#card_name> {
-						self.slots.#name.take()
-					}
-					pub fn #send_single(&mut self, value: #ty) {
-						let mut input = Input::default();
-						input.#input_fn_name(value);
-						self.send(input);
-					}
-				};
-				ift.take_all = quote! {
-					if other.slots.#name.is_some() {
-						mem::swap(&mut self.slots.#name, &mut other.slots.#name);
-					}
-				};
-				ift.check_input = quote! {
-					&& (self.slots.#name.is_some() || input.#income.is_none())
-				};
-			}
-			_ => {}
-		};
+                    }
+                };
+                ift.slot_part = quote! {
+                    #name: Option<#card_name>,
+                };
+                ift.slot_init = quote! {
+                    #name: Some(#card_name {data: data.clone()}),
+                };
+                let push_card = format_ident!("push_{}", name);
+                let pull_card = format_ident!("pull_{}", name);
+                let send_single = format_ident!("send_{}", name);
+                ift.sink_fn = quote! {
+                    pub fn #push_card(&mut self, card: #card_name) {
+                        let id_self = Rc::downgrade(&self.id);
+                        if id_self.ptr_eq(&card.data) {
+                            self.slots.#name = Some(card);
+                        } else {
+                            panic!("Card has incorrect id");
+                        }
+                    }
+                    pub fn #pull_card(&mut self) -> Option<#card_name> {
+                        self.slots.#name.take()
+                    }
+                    pub fn #send_single(&mut self, value: #ty) {
+                        let mut input = Input::default();
+                        input.#input_fn_name(value);
+                        self.send(input);
+                    }
+                };
+                ift.take_all = quote! {
+                    if other.slots.#name.is_some() {
+                        mem::swap(&mut self.slots.#name, &mut other.slots.#name);
+                    }
+                };
+                ift.check_input = quote! {
+                    && (self.slots.#name.is_some() || input.#income.is_none())
+                };
+            }
+            _ => {}
+        };
         ift
     }
 }

@@ -39,13 +39,8 @@ pub enum ReExpr {
 }
 
 #[derive(Debug)]
-pub enum RePrimary {
-	Var(VarExpr),
-	Evt(EvtExpr),
-	Fold(FoldExpr),
-	Choice(ChoiceExpr),
-	Map(MapExpr),
-	Filter(FilterExpr),
+pub struct RePrimary {
+    pub expr: ReExpr,
 }
 
 #[derive(Debug)]
@@ -174,22 +169,21 @@ impl Parse for ReLocal {
 }
 
 impl Parse for RePrimary {
-	fn parse(input: ParseStream) -> syn::Result<Self> {
-		let mut as_reexpr: ReExpr = input.parse()?;
-		match as_reexpr {
-		    ReExpr::Var(var) => {
-				Ok(Self::Var(var))
-			}
-		    ReExpr::Evt(evt) => {Ok(Self::Evt(evt))}
-		   	ReExpr::Fold(fold) => {Ok(Self::Fold(fold))}
-		    ReExpr::Choice(choice) => {Ok(Self::Choice(choice))}
-		    ReExpr::Map(map) => {Ok(Self::Map(map))}
-		    ReExpr::Filter(filter) => {Ok(Self::Filter(filter))}
-			_ => {
-				Err(Error::new(input.span(), "identifiers and signal groups not allowed"))
-			}
-		}
-	}
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let as_reexpr: ReExpr = input.parse()?;
+        match as_reexpr {
+            ReExpr::Var(_) => Ok(Self { expr: as_reexpr }),
+            ReExpr::Evt(_) => Ok(Self { expr: as_reexpr }),
+            ReExpr::Fold(_) => Ok(Self { expr: as_reexpr }),
+            ReExpr::Choice(_) => Ok(Self { expr: as_reexpr }),
+            ReExpr::Map(_) => Ok(Self { expr: as_reexpr }),
+            ReExpr::Filter(_) => Ok(Self { expr: as_reexpr }),
+            _ => Err(Error::new(
+                input.span(),
+                "identifiers and signal groups not allowed",
+            )),
+        }
+    }
 }
 
 impl Parse for ReExpr {
@@ -198,6 +192,12 @@ impl Parse for ReExpr {
         while input.peek(Token![||]) {
             let choice_token: Token![||] = input.parse()?;
             let choice_expr = parse_method(input)?;
+            if let ReExpr::Group(groupexpr) = choice_expr {
+                return Err(Error::new(
+                    groupexpr.paren.span,
+                    "signal groups not allowed as input to choice",
+                ));
+            }
             method_call = ReExpr::Choice(ChoiceExpr {
                 left_expr: Box::new(method_call),
                 oror: choice_token,
@@ -268,6 +268,14 @@ impl Parse for GroupExpr {
         let content;
         let paren = parenthesized!(content in input);
         let punctuated = content.call(Punctuated::parse_separated_nonempty)?;
+        for expr in &punctuated {
+            if let ReExpr::Group(groupexpr) = expr {
+                return Err(Error::new(
+                    groupexpr.paren.span,
+                    "signal grouping can not be nested",
+                ));
+            }
+        }
         Ok(GroupExpr {
             paren,
             exprs: punctuated,
@@ -332,6 +340,12 @@ fn parse_method(input: ParseStream) -> syn::Result<ReExpr> {
             let filter_token: kw::filter = input.parse()?;
             let paren = parenthesized!(content in input);
             let closure = content.parse()?;
+            if let ReExpr::Group(groupexpr) = expr {
+                return Err(Error::new(
+                    groupexpr.paren.span,
+                    "signal group not allowed as input to filter",
+                ));
+            }
             expr = ReExpr::Filter(FilterExpr {
                 left_expr: Box::new(expr),
                 dot_token: dot,
