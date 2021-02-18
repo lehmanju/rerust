@@ -1,11 +1,8 @@
+use super::{Generate, InterfaceTokens};
+use crate::analysis::{ChoiceNode, Family, FilterNode, FoldNode, MapNode, ReNode};
 use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
-use syn::{Type, TypeReference};
-
-use crate::analysis::{ChoiceNode, Family, FilterNode, FoldNode, MapNode, ReNode};
-
-use super::{Generate, InterfaceTokens};
 
 impl Generate for MapNode<'_> {
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
@@ -48,6 +45,9 @@ impl Generate for MapNode<'_> {
         };
         ift.change_struct = quote! {
             #name: bool,
+        };
+        ift.state_default = quote! {
+            #name: #ty::default(),
         };
         ift
     }
@@ -210,6 +210,9 @@ impl Generate for FilterNode<'_> {
         ift.change_struct = quote! {
             #name: bool,
         };
+        ift.state_default = quote! {
+            #name: #ty::default(),
+        };
         ift
     }
 
@@ -247,6 +250,9 @@ impl Generate for ChoiceNode {
         };
         ift.change_struct = quote! {
             #name: bool,
+        };
+        ift.state_default = quote! {
+            #name: #ty::default(),
         };
         ift
     }

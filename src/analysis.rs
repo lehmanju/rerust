@@ -5,12 +5,7 @@
 use crate::parser::{ReBlock, ReClosure, ReExpr, ReIdent, ReLocal};
 use enum_dispatch::enum_dispatch;
 use petgraph::{graph::NodeIndex, Graph};
-use proc_macro2::Span;
-use syn::{
-    punctuated::Punctuated,
-    token::{Comma, Paren},
-    Error, Expr, Result, Type, TypeTuple,
-};
+use syn::{Error, Expr, Result, Type};
 
 pub struct ReVisitor<'ast> {
     pub graph: Graph<ReNode<'ast>, ReEdge>,

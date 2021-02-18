@@ -17,7 +17,6 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_state = TokenStream::new();
     let mut tks_function = TokenStream::new();
     let mut tks_update = TokenStream::new();
-    let mut tks_update_return = TokenStream::new();
     let mut tks_observers = TokenStream::new();
     let mut tks_input_struct = TokenStream::new();
     let mut tks_notify = TokenStream::new();
@@ -212,7 +211,11 @@ fn get_incoming_weights<'ast>(
     let mut weights = Vec::new();
     for node_idx in incoming_nodes {
         let node = graph.node_weight(node_idx).expect("invalid node index");
-        weights.push(node);
+        if let ReNode::Name(_) = node {
+            weights.extend(get_incoming_weights(graph, node_idx));
+        } else {
+            weights.push(node);
+        }
     }
     weights
 }
@@ -263,8 +266,9 @@ impl Generate for NameNode<'_> {
         ift.observer_struct = quote! {
             #name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
         };
+        let observer_ident = format_ident!("observer_{}", ident);
         ift.functions = quote! {
-            pub fn #ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
+            pub fn #observer_ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
                 self.observers.#name.push(observer);
             }
         };

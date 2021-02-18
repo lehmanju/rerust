@@ -4,7 +4,6 @@ mod natgraph {
     use rerust::rerust_gen;
     rerust_gen! {
         let source = Var::<i32>(0i32);
-        let c1 = source;
         let b1 = source.map(|v: &i32| -> i32 { v + 1 });
         let b2 = b1.map(|v: &i32| -> i32 { v + 1 });
         let b3 = b2.map(|v: &i32| -> i32 { v + 1 });
@@ -13,22 +12,22 @@ mod natgraph {
         let c4 = c3.map(|v: &i32| -> i32 { v + 1 });
         let a1 = b2.map(|v: &i32| -> i32 { v + 1 });
         let a2 = a1.map(|v: &i32| -> i32 { v + 1 });
-        let a3 = (a2,b2).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let a3 = (a2,b2).map(|a: &i32, b: &i32| -> i32 { *a + *b });
         let a4 = a3.map(|v: &i32| -> i32 { v + 1 });
-        let b4 = (a4,b3).map(|(a,b) : &(i32,i32)| -> i32 { 0 });
+        let b4 = (a4,b3).map(|a: &i32, b: &i32| -> i32 { 0 });
         let b5 = b4.map(|v: &i32| -> i32 { v + 1 });
         let b6 = b5.map(|v: &i32| -> i32 { v + 1 });
         let b7 = b6.map(|v: &i32| -> i32 { v + 1 });
-        let b8 = (b7,c2).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
-        let c5 = (c4,b8).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let b8 = (b7,c2).map(|a: &i32, b: &i32| -> i32 { *a + *b });
+        let c5 = (c4,b8).map(|a: &i32, b: &i32| -> i32 { *a + *b });
         let d1 = c2.map(|v: &i32| -> i32 { v + 1 });
-        let e1 = c1.map(|v: &i32| -> i32 { 0 });
+        let e1 = source.map(|v: &i32| -> i32 { 0 });
         let e2 = e1.map(|v: &i32| -> i32 { v + 1 });
         let e3 = e2.map(|v: &i32| -> i32 { v + 1 });
         let e4 = e3.map(|v: &i32| -> i32 { v + 1 });
-        let e5 = (e4,c2).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let e5 = (e4,c2).map(|a: &i32, b: &i32| -> i32 { *a + *b });
         let e6 = c2.map(|v: &i32| -> i32 { v + 1 });
-        let e7 = (e6,d1).map(|(a,b) : &(i32,i32)| -> i32 { *a + *b });
+        let e7 = (e6,d1).map(|a: &i32, b: &i32| -> i32 { *a + *b });
     }
 }
 

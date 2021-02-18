@@ -7,7 +7,7 @@ use crate::analysis::{EvtNode, Family, ReNode, VarNode};
 
 use super::{Generate, InterfaceTokens};
 
-fn generate_common_source(name: &Ident, fam: Family, ty: &Type) -> InterfaceTokens {
+fn generate_common_source(name: &Ident, ty: &Type) -> InterfaceTokens {
     let mut ift = InterfaceTokens::default();
     ift.update_part = quote! {
         if inputs.#name.is_some() {
@@ -36,7 +36,7 @@ impl Generate for VarNode<'_> {
         let name = self.ident();
         let ty = self.ty;
         let initial_state = self.initial;
-        let mut ift = generate_common_source(&name, Family::Variable, ty);
+        let mut ift = generate_common_source(&name, ty);
 
         ift.state_default = quote! {
             #name: #initial_state,
@@ -59,7 +59,7 @@ impl Generate for EvtNode<'_> {
         let name = self.ident();
         let ty = self.ty;
 
-        let mut ift = generate_common_source(&name, Family::Event, ty);
+        let mut ift = generate_common_source(&name, ty);
 
         ift.state_default = quote! {
             #name: #ty::default(),
