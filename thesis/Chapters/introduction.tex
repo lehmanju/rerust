@@ -1,0 +1,14 @@
+\chapter{Introduction}
+\label{introduction}
+
+\ac{FRP} had a lasting impact and is now available in many languages and on many platforms. The high-level abstractions of \ac{FRP} for the underlying dataflow model promise a more efficient development of interactive applications. Unfortunately, \ac{FRP} has not seen any significant adoption in mainstream software and remains to be a niche. We argue that this is because of either no available interfaces at all, restricting the developer to use pure \ac{FRP}, or interfaces that are not ergonomic and prevent adoption in existing codebases.
+
+\textsf{ReactiFi}~\citep{reactifi} has already demonstrated how \ac{FRP} can be used on embedded systems. Its strengths are predictable resource consumption and efficient data management. However, it requires the use of foreign tools to compile a \textsf{ReactiFi} program to C code. This intermediate compilation step can make interaction with existing code hard because changes in \textsf{ReactiFi} code might break existing interfaces upon recompilation. Additionally, with C as language careless use of \textsf{ReactiFi} interfaces could break \ac{FRP} guarantees. 
+
+In the system programming world Rust has seen a recent surge in popularity. While C is known for its inherent unsafe code Rust mitigates most these problems with its advanced type system. A huge ecosystem and a good portion of modern language features make it ideal as a replacement for C. For \ac{FRP} specifically, Rust's zero-cost abstractions can provide a good interface for existing code. Furthermore, recently stabilized procedural macros allow for in-place code generation without requiring additional tooling.
+
+The goals of this thesis are thus: (1) integrating zero-cost \ac{FRP} abstractions into Rust. (2) using Rust's advanced type system to express \ac{FRP} guarantees and thus bypass additional checks.
+
+To support our arguments we present a rusty \ac{DSL}, called \textsf{ReRust}, to express \ac{FRP} logic and a corresponding procedural macro to generate native Rust code in-place. \textsf{ReRust} imitates features of \textsf{ReactiFi} and \textsf{ReScala}~\citep{rescala} and expresses those in Rust syntax. Programs written in \textsf{ReRust} will also include native Rust code that persists through code generation. Incidentally, \ac{DSL} code describes the broad structure of a programs while user-embedded native Rust code provides functionality. This means that there are no restrictions whatsoever on what types and functions are available to the developer. A macro invocation of the \textsf{ReRust} compiler transforms a finished program to Rust code in-place. Interfacing code can then be directly written in the same source file and compiles just at the same time with \ac{DSL} code. Because we only use standard library features when generating code, there are no platform restrictions for the final code to run on.
+
+%TODO: outline thesis structure/content
