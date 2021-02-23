@@ -5,9 +5,9 @@ mod generated {
 
     rerust_gen! {
         let x = Var::<u32>(1u32);
-        let y = x.map(|x: u32| -> u32 {x * 2});
-        let z = x.map(|x: u32| -> u32 {x * 3});
-        let t = (y,z).map(|y: u32, z: u32| -> u32 {y + z});
+        let y = x.map(|x: &u32| -> u32 {x * 2});
+        let z = x.map(|x: &u32| -> u32 {x * 3});
+        let t = (y,z).map(|y: &u32, z: &u32| -> u32 {y + z});
     }
 }
 

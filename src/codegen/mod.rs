@@ -266,7 +266,7 @@ impl Generate for NameNode<'_> {
         ift.observer_struct = quote! {
             #name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
         };
-        let observer_ident = format_ident!("observer_{}", ident);
+        let observer_ident = format_ident!("observe_{}", ident);
         ift.functions = quote! {
             pub fn #observer_ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
                 self.observers.#name.push(observer);
