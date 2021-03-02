@@ -2,7 +2,7 @@ use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    token::{self, Let, Semi},
+    token::{self, Let, OrOr, Semi},
     Block, Error, Expr, Ident, Pat, PatType, Token, Type,
 };
 use token::{Comma, Paren, RArrow};
@@ -15,9 +15,10 @@ pub struct ReBlock {
 #[derive(Debug)]
 pub struct ReLocal {
     pub let_token: Let,
+    pub pin_token: Option<kw::pin>,
     pub ident: ReIdent,
     pub eq_token: Token![=],
-    pub init: RePrimary,
+    pub init: ReExpr,
     pub semi_token: Semi,
 }
 
@@ -36,17 +37,13 @@ pub enum ReExpr {
     Choice(ChoiceExpr),
     Map(MapExpr),
     Filter(FilterExpr),
-}
-
-#[derive(Debug)]
-pub struct RePrimary {
-    pub expr: ReExpr,
+    Changed(ChangedExpr),
 }
 
 #[derive(Debug)]
 pub struct ChoiceExpr {
     pub left_expr: Box<ReExpr>,
-    pub oror: Token![||],
+    pub oror: OrOr,
     pub right_expr: Box<ReExpr>,
 }
 
@@ -87,6 +84,14 @@ pub struct MapExpr {
 }
 
 #[derive(Debug)]
+pub struct ChangedExpr {
+    pub left_expr: Box<ReExpr>,
+    pub changed_token: kw::changed,
+    pub dot_token: Token![.],
+    pub paren: Paren,
+}
+
+#[derive(Debug)]
 pub struct FoldExpr {
     pub left_expr: Box<ReExpr>,
     pub fold_token: kw::fold,
@@ -117,6 +122,8 @@ pub struct ReClosure {
 }
 
 pub mod kw {
+    syn::custom_keyword!(pin);
+    syn::custom_keyword!(changed);
     syn::custom_keyword!(filter);
     syn::custom_keyword!(map);
     syn::custom_keyword!(fold);
@@ -160,29 +167,12 @@ impl Parse for ReLocal {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(ReLocal {
             let_token: input.parse()?,
+            pin_token: input.parse()?,
             ident: input.parse()?,
             eq_token: input.parse()?,
             init: input.parse()?,
             semi_token: input.parse()?,
         })
-    }
-}
-
-impl Parse for RePrimary {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let as_reexpr: ReExpr = input.parse()?;
-        match as_reexpr {
-            ReExpr::Var(_) => Ok(Self { expr: as_reexpr }),
-            ReExpr::Evt(_) => Ok(Self { expr: as_reexpr }),
-            ReExpr::Fold(_) => Ok(Self { expr: as_reexpr }),
-            ReExpr::Choice(_) => Ok(Self { expr: as_reexpr }),
-            ReExpr::Map(_) => Ok(Self { expr: as_reexpr }),
-            ReExpr::Filter(_) => Ok(Self { expr: as_reexpr }),
-            _ => Err(Error::new(
-                input.span(),
-                "identifiers and signal groups not allowed",
-            )),
-        }
     }
 }
 
@@ -367,6 +357,24 @@ fn parse_method(input: ParseStream) -> syn::Result<ReExpr> {
                 init_expr: init,
                 closure,
                 comma_token: comma,
+            })
+        } else if input.peek(kw::changed) {
+            let changed_token: kw::changed = input.parse()?;
+            let paren = parenthesized!(content in input);
+            if !content.is_empty() {
+                return Err(Error::new(paren.span, "expected empty parentheses"));
+            }
+            if let ReExpr::Group(groupexpr) = expr {
+                return Err(Error::new(
+                    groupexpr.paren.span,
+                    "signal group not allowed as input to changed",
+                ));
+            }
+            expr = ReExpr::Changed(ChangedExpr {
+                left_expr: Box::new(expr),
+                dot_token: dot,
+                changed_token,
+                paren,
             })
         }
     }

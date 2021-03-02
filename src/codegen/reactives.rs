@@ -1,5 +1,5 @@
 use super::{Generate, InterfaceTokens};
-use crate::analysis::{ChoiceNode, Family, FilterNode, FoldNode, MapNode, ReNode};
+use crate::analysis::{ChangedNode, ChoiceNode, Family, FilterNode, FoldNode, MapNode, ReNode, NodeData};
 use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
@@ -21,6 +21,12 @@ impl Generate for MapNode<'_> {
         let (event_condition, var_condition) = generate_condition(incoming.clone(), family);
         let method_args = generate_method_args(incoming.clone());
 
+		if self.pin() {
+			
+		} else {
+
+		}
+		
         if family == Family::Event {
             ift.update_part = quote! {
                 if #event_condition {
@@ -39,7 +45,7 @@ impl Generate for MapNode<'_> {
                 }
             }
         }
-        let ty = self.ty;
+        let ty = self.ty();
         ift.state_struct = quote! {
             #name: #ty,
         };
@@ -54,10 +60,6 @@ impl Generate for MapNode<'_> {
 
     fn ident(&self) -> Ident {
         format_ident!("map_{}", self.id)
-    }
-
-    fn family(&self) -> Family {
-        self.family
     }
 }
 
@@ -160,10 +162,6 @@ impl Generate for FoldNode<'_> {
         };
         ift
     }
-
-    fn family(&self) -> Family {
-        self.family
-    }
 }
 
 impl Generate for FilterNode<'_> {
@@ -216,16 +214,12 @@ impl Generate for FilterNode<'_> {
         ift
     }
 
-    fn family(&self) -> Family {
-        self.family
-    }
-
     fn ident(&self) -> Ident {
         format_ident!("filter_{}", self.id)
     }
 }
 
-impl Generate for ChoiceNode {
+impl Generate for ChoiceNode<'_> {
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
         let mut ift = InterfaceTokens::default();
         let name = self.ident();
@@ -257,9 +251,16 @@ impl Generate for ChoiceNode {
         ift
     }
     fn ident(&self) -> Ident {
-        format_ident!("choice_{}", self.id)
+        format_ident!("choice_{}", self.id())
     }
-    fn family(&self) -> Family {
-        self.family
+}
+
+impl Generate for ChangedNode<'_> {
+    fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
+        todo!()
+    }
+
+    fn ident(&self) -> Ident {
+        todo!()
     }
 }

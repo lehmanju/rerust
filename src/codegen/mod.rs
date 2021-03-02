@@ -244,14 +244,9 @@ pub struct InterfaceTokens {
 pub trait Generate {
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens;
     fn ident(&self) -> Ident;
-    fn family(&self) -> Family;
 }
 
 impl Generate for NameNode<'_> {
-    fn family(&self) -> Family {
-        self.family
-    }
-
     fn ident(&self) -> Ident {
         self.id.ident.clone()
     }

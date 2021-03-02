@@ -2,92 +2,29 @@
 // check incoming and outgoing types
 // prefix for anonymous reactives
 
-use crate::parser::{ReBlock, ReClosure, ReExpr, ReIdent, ReLocal};
-use enum_dispatch::enum_dispatch;
+use crate::parser::{ReBlock, ReClosure, ReExpr, ReLocal};
 use petgraph::{graph::NodeIndex, Graph};
-use syn::{Error, Expr, Result, Type};
+use syn::{Error, Result, Type};
+
+use super::{
+    ChangedNode, ChoiceNode, EvtNode, Family, FilterNode, FoldNode, MapNode, NameNode, NodeData,
+    ReData, ReEdge, ReNode, VarNode,
+};
 
 pub struct ReVisitor<'ast> {
-    pub graph: Graph<ReNode<'ast>, ReEdge>,
-    name_nodes: Vec<(NameNode<'ast>, NodeIndex)>,
+    pub graph: Graph<ReNode<'ast>, ReEdge<'ast>>,
+    name_nodes: Vec<(&'ast NameNode<'ast>, NodeIndex)>,
     node_count: u32,
 }
-#[enum_dispatch(Generate)]
-#[derive(Debug)]
-pub enum ReNode<'ast> {
-    Var(VarNode<'ast>),
-    Evt(EvtNode<'ast>),
-    Name(NameNode<'ast>),
-    Fold(FoldNode<'ast>),
-    Map(MapNode<'ast>),
-    Choice(ChoiceNode),
-    Filter(FilterNode<'ast>),
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Family {
-    Event,
-    Variable,
-}
-
-#[derive(Debug)]
-pub struct ChoiceNode {
-    pub family: Family,
-    pub ty: Type,
-    pub id: u32,
-}
-
-#[derive(Debug)]
-pub struct EvtNode<'ast> {
-    pub family: Family,
-    pub ty: &'ast Type,
-    pub id: u32,
-}
-
-#[derive(Debug)]
-pub struct VarNode<'ast> {
-    pub family: Family,
-    pub initial: &'ast Expr,
-    pub ty: &'ast Type,
-    pub id: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct NameNode<'ast> {
-    pub family: Family,
-    pub id: &'ast ReIdent,
-    pub ty: Type,
-}
-
-#[derive(Debug)]
-pub struct FoldNode<'ast> {
-    pub family: Family,
-    pub initial: &'ast Expr,
-    pub ty: &'ast Type,
-    pub update_expr: &'ast ReClosure,
-    pub id: u32,
-}
-
-#[derive(Debug)]
-pub struct MapNode<'ast> {
-    pub family: Family,
-    pub ty: &'ast Type,
-    pub update_expr: &'ast ReClosure,
-    pub id: u32,
-}
-
-#[derive(Debug)]
-pub struct FilterNode<'ast> {
-    pub family: Family,
-    pub ty: Type,
-    pub filter_expr: &'ast ReClosure,
-    pub id: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct ReEdge {
-    ty: Type,
-}
+// #[derive(Debug)]
+// pub struct ReNode<'ast> {
+//     pub id: u32,
+//     pub family: Family,
+//     pub ty: &'ast Type,
+//     pub pin: bool,
+//     pub data: ReData<'ast>,
+// }
 
 impl<'ast> ReVisitor<'ast> {
     pub fn visit_reblock(&mut self, i: &'ast ReBlock) -> Result<()> {
@@ -97,7 +34,7 @@ impl<'ast> ReVisitor<'ast> {
         Ok(())
     }
     fn visit_relocal(&mut self, i: &'ast ReLocal) -> Result<()> {
-        let (mut last_idxs, last_fam) = self.visit_reexpr(&i.init.expr)?;
+        let (mut last_idxs, last_fam) = self.visit_reexpr(&i.init)?;
         let name = &i.ident;
         let name_str = name.ident.to_string();
         if self.name_nodes.iter().any(|(n, _)| n.id.ident == name_str) {
@@ -106,21 +43,37 @@ impl<'ast> ReVisitor<'ast> {
                 "identifier already occupied",
             ));
         }
-        assert!(last_idxs.len() == 1); // let name = ( ... ); is forbidden
         let (last_idx, last_ty) = last_idxs.remove(0);
+        let mut last_node = self.graph.node_weight_mut(last_idx).unwrap();
+        let mut pin = false;
+        if i.pin_token.is_some() {
+            if last_idxs.len() != 1 {
+                return Err(Error::new(
+                    i.pin_token.unwrap().span,
+                    "cannot pin group of reactives",
+                ));
+            }
+            pin = true;
+            *last_node.pin_mut() = true;
+        }
         let name_node = NameNode {
             id: name,
-            ty: last_ty.clone(),
-            family: last_fam,
+            data: ReData {
+                id: self.next_idx(),
+                family: last_fam,
+                ty: last_ty,
+                pin,
+            },
         };
-        let node_idx = self.graph.add_node(ReNode::Name(name_node.clone()));
-        self.name_nodes.push((name_node, node_idx));
+        let new_node = ReNode::Name(name_node);
+        let node_idx = self.graph.add_node(new_node);
+        self.name_nodes.push((&name_node, node_idx));
         let edge = ReEdge { ty: last_ty };
         self.graph.add_edge(last_idx, node_idx, edge);
         Ok(())
     }
 
-    fn visit_reexpr(&mut self, i: &'ast ReExpr) -> Result<(Vec<(NodeIndex, Type)>, Family)> {
+    fn visit_reexpr(&mut self, i: &'ast ReExpr) -> Result<(Vec<(NodeIndex, &'ast Type)>, Family)> {
         match i {
             ReExpr::Group(groupexpr) => {
                 let mut incoming_nodes = Vec::new();
@@ -136,23 +89,30 @@ impl<'ast> ReVisitor<'ast> {
                 Ok((incoming_nodes, family))
             }
             ReExpr::Var(varexpr) => {
-                let node = ReNode::Var(VarNode {
-                    initial: &varexpr.expr,
+                let data = ReData {
+                    pin: true,
                     ty: &varexpr.ty,
                     family: Family::Variable,
                     id: self.next_idx(),
+                };
+                let node = ReNode::Var(VarNode {
+                    initial: &varexpr.expr,
+                    data,
                 });
                 let idx = self.graph.add_node(node);
-                Ok((vec![(idx, varexpr.ty.clone())], Family::Variable))
+                Ok((vec![(idx, &varexpr.ty)], Family::Variable))
             }
             ReExpr::Evt(evtexpr) => {
                 let node = ReNode::Evt(EvtNode {
-                    ty: &evtexpr.ty,
-                    id: self.next_idx(),
-                    family: Family::Event,
+                    data: ReData {
+                        pin: false,
+                        ty: &evtexpr.ty,
+                        id: self.next_idx(),
+                        family: Family::Event,
+                    },
                 });
                 let idx = self.graph.add_node(node);
-                Ok((vec![(idx, evtexpr.ty.clone())], Family::Event))
+                Ok((vec![(idx, &evtexpr.ty)], Family::Event))
             }
             ReExpr::Ident(identexpr) => {
                 let idx = self
@@ -160,26 +120,35 @@ impl<'ast> ReVisitor<'ast> {
                     .iter()
                     .find(|(n, _)| identexpr.ident == n.id.ident);
                 match idx {
-                    Some((name, idx)) => Ok((vec![(*idx, name.ty.clone())], name.family)),
+                    Some((name, idx)) => Ok((vec![(*idx, name.ty())], name.family())),
                     None => Err(Error::new(identexpr.ident.span(), "unknown reactive")),
                 }
             }
             ReExpr::Fold(foldexpr) => {
                 let (incoming, fam) = self.visit_reexpr(&foldexpr.left_expr)?;
                 let ty = self.visit_reclosure(&foldexpr.closure)?;
+                if fam != Family::Event {
+                    return Err(Error::new(
+                        foldexpr.fold_token.span,
+                        "incoming node must be event",
+                    ));
+                }
                 let node = ReNode::Fold(FoldNode {
                     initial: &foldexpr.init_expr,
-                    ty,
                     update_expr: &foldexpr.closure,
-                    id: self.next_idx(),
-                    family: fam,
+                    data: ReData {
+                        ty,
+                        id: self.next_idx(),
+                        family: fam,
+                        pin: true,
+                    },
                 });
                 let idx = self.graph.add_node(node);
                 for (node, ty) in incoming {
                     let edge = ReEdge { ty };
                     self.graph.add_edge(node, idx, edge);
                 }
-                Ok((vec![(idx, ty.clone())], Family::Variable))
+                Ok((vec![(idx, ty)], Family::Variable))
             }
             ReExpr::Choice(choiceexpr) => {
                 let (mut a_nodes, a_fam) = self.visit_reexpr(&choiceexpr.left_expr)?;
@@ -191,16 +160,22 @@ impl<'ast> ReVisitor<'ast> {
                 if a_ty != b_ty {
                     return Err(Error::new(span, "mismatching types"));
                 }
-                if a_fam != b_fam {
-                    return Err(Error::new(span, "mismatching reactive family"));
+                if a_fam != Family::Event || b_fam != Family::Event {
+                    return Err(Error::new(
+                        choiceexpr.oror.spans[0],
+                        "changed only valid on variables",
+                    ));
                 }
                 let node = ReNode::Choice(ChoiceNode {
-                    ty: a_ty.clone(),
-                    id: self.next_idx(),
-                    family: a_fam,
+                    data: ReData {
+                        pin: false,
+                        ty: a_ty,
+                        id: self.next_idx(),
+                        family: a_fam,
+                    },
                 });
                 let idx = self.graph.add_node(node);
-                let edge = ReEdge { ty: a_ty.clone() };
+                let edge = ReEdge { ty: a_ty };
                 self.graph.add_edge(a_idx, idx, edge.clone());
                 self.graph.add_edge(b_idx, idx, edge);
                 Ok((vec![(idx, a_ty)], a_fam))
@@ -209,10 +184,13 @@ impl<'ast> ReVisitor<'ast> {
                 let (incoming, incoming_fam) = self.visit_reexpr(&mapexpr.left_expr)?;
                 let ty = self.visit_reclosure(&mapexpr.closure)?;
                 let node = ReNode::Map(MapNode {
-                    ty,
                     update_expr: &mapexpr.closure,
-                    id: self.next_idx(),
-                    family: incoming_fam,
+                    data: ReData {
+                        pin: false,
+                        ty,
+                        id: self.next_idx(),
+                        family: incoming_fam,
+                    },
                 });
                 let idx = self.graph.add_node(node);
                 for (node, ty) in incoming {
@@ -220,23 +198,55 @@ impl<'ast> ReVisitor<'ast> {
                     self.graph.add_edge(node, idx, edge);
                 }
 
-                Ok((vec![(idx, ty.clone())], incoming_fam))
+                Ok((vec![(idx, ty)], incoming_fam))
             }
             ReExpr::Filter(filterexpr) => {
                 let (mut incoming, incoming_fam) = self.visit_reexpr(&filterexpr.left_expr)?;
                 self.visit_reclosure(&filterexpr.closure)?;
                 assert!(incoming.len() == 1); // only one reactive as input
+                if incoming_fam != Family::Event {
+                    return Err(Error::new(
+                        filterexpr.filter_token.span,
+                        "filter only valid on events",
+                    ));
+                }
                 let (idx, ty) = incoming.remove(0);
                 let node = ReNode::Filter(FilterNode {
-                    ty: ty.clone(),
                     filter_expr: &filterexpr.closure,
-                    id: self.next_idx(),
-                    family: incoming_fam,
+                    data: ReData {
+                        pin: false,
+                        ty,
+                        id: self.next_idx(),
+                        family: incoming_fam,
+                    },
                 });
                 let idx_filter = self.graph.add_node(node);
-                let edge = ReEdge { ty: ty.clone() };
+                let edge = ReEdge { ty };
                 self.graph.add_edge(idx, idx_filter, edge);
                 Ok((vec![(idx, ty)], incoming_fam))
+            }
+            ReExpr::Changed(changedexpr) => {
+                let (incoming, incoming_fam) = self.visit_reexpr(&changedexpr.left_expr)?;
+                assert!(incoming.len() == 1);
+                let (idx, ty) = incoming.remove(0);
+                if incoming_fam == Family::Event {
+                    return Err(Error::new(
+                        changedexpr.changed_token.span,
+                        "changed only valid on variables",
+                    ));
+                }
+                let node = ReNode::Changed(ChangedNode {
+                    data: ReData {
+                        pin: true,
+                        ty,
+                        id: self.next_idx(),
+                        family: Family::Event,
+                    },
+                });
+                let idx_changed = self.graph.add_node(node);
+                let edge = ReEdge { ty };
+                self.graph.add_edge(idx, idx_changed, edge);
+                Ok((vec![(idx, ty)], Family::Event))
             }
         }
     }
@@ -248,7 +258,7 @@ impl<'ast> ReVisitor<'ast> {
     fn visit_reclosure(&mut self, i: &'ast ReClosure) -> Result<&'ast Type> {
         Ok(&i.return_type)
     }
-    pub fn reactive_graph(self) -> Graph<ReNode<'ast>, ReEdge> {
+    pub fn reactive_graph(self) -> Graph<ReNode<'ast>, ReEdge<'ast>> {
         self.graph
     }
     pub fn new() -> Self {
