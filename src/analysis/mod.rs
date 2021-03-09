@@ -4,13 +4,13 @@ use enum_dispatch::enum_dispatch;
 
 use crate::parser::{ReClosure, ReIdent};
 
-mod visitor;
+pub mod visitor;
 
 #[derive(Debug, Clone)]
-pub struct ReData<'ast> {
+pub struct ReData {
     pub id: u32,
     pub family: Family,
-    pub ty: &'ast Type,
+    pub ty: Type,
     pub pin: bool,
 }
 
@@ -27,13 +27,12 @@ pub trait NodeData {
 #[derive(Debug)]
 pub enum ReNode<'ast> {
     Var(VarNode<'ast>),
-    Evt(EvtNode<'ast>),
+    Evt(EvtNode),
     Name(NameNode<'ast>),
     Fold(FoldNode<'ast>),
     Map(MapNode<'ast>),
-    Choice(ChoiceNode<'ast>),
     Filter(FilterNode<'ast>),
-    Changed(ChangedNode<'ast>),
+    Changed(ChangedNode),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,54 +42,49 @@ pub enum Family {
 }
 
 #[derive(Debug)]
-pub struct ChangedNode<'ast> {
-    pub data: ReData<'ast>,
+pub struct ChangedNode {
+    pub data: ReData,
 }
 
 #[derive(Debug)]
-pub struct ChoiceNode<'ast> {
-    pub data: ReData<'ast>,
-}
-
-#[derive(Debug)]
-pub struct EvtNode<'ast> {
-    pub data: ReData<'ast>,
+pub struct EvtNode {
+    pub data: ReData,
 }
 
 #[derive(Debug)]
 pub struct VarNode<'ast> {
     pub initial: &'ast Expr,
-    pub data: ReData<'ast>,
+    pub data: ReData,
 }
 
 #[derive(Clone, Debug)]
 pub struct NameNode<'ast> {
     pub id: &'ast ReIdent,
-    pub data: ReData<'ast>,
+    pub data: ReData,
 }
 
 #[derive(Debug)]
 pub struct FoldNode<'ast> {
     pub initial: &'ast Expr,
     pub update_expr: &'ast ReClosure,
-    pub data: ReData<'ast>,
+    pub data: ReData,
 }
 
 #[derive(Debug)]
 pub struct MapNode<'ast> {
     pub update_expr: &'ast ReClosure,
-    pub data: ReData<'ast>,
+    pub data: ReData,
 }
 
 #[derive(Debug)]
 pub struct FilterNode<'ast> {
     pub filter_expr: &'ast ReClosure,
-    pub data: ReData<'ast>,
+    pub data: ReData,
 }
 
 #[derive(Clone, Debug)]
-pub struct ReEdge<'ast> {
-    ty: &'ast Type,
+pub struct ReEdge {
+    ty: Type,
 }
 
 impl NodeData for VarNode<'_> {
@@ -115,29 +109,7 @@ impl NodeData for VarNode<'_> {
     }
 }
 
-impl NodeData for EvtNode<'_> {
-    fn family(&self) -> Family {
-        self.data.family()
-    }
-
-    fn ty(&self) -> &Type {
-        self.data.ty()
-    }
-
-    fn pin(&self) -> bool {
-        self.data.pin()
-    }
-
-    fn pin_mut(&mut self) -> &mut bool {
-        self.data.pin_mut()
-    }
-
-    fn id(&self) -> u32 {
-        self.data.id()
-    }
-}
-
-impl NodeData for ChoiceNode<'_> {
+impl NodeData for EvtNode {
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -247,7 +219,7 @@ impl NodeData for FilterNode<'_> {
     }
 }
 
-impl NodeData for ChangedNode<'_> {
+impl NodeData for ChangedNode {
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -269,13 +241,13 @@ impl NodeData for ChangedNode<'_> {
     }
 }
 
-impl NodeData for ReData<'_> {
+impl NodeData for ReData {
     fn family(&self) -> Family {
         self.family
     }
 
     fn ty(&self) -> &Type {
-        self.ty
+        &self.ty
     }
 
     fn pin(&self) -> bool {

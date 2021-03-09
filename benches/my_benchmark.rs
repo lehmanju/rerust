@@ -243,8 +243,7 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
 pub fn natural_graph_rerust(c: &mut Criterion) {
     let mut state = natgraph::State::default();
     let init = natgraph::Input::initial();
-    let mut change = natgraph::Change::default();
-    natgraph::Program::update(&mut state, init, &mut change);
+    natgraph::Program::update(&mut state, init);
     let mut updated_input = natgraph::Input::default();
     updated_input.set_source(1);
 
@@ -263,11 +262,10 @@ pub fn natural_graph_rerust(c: &mut Criterion) {
                 (
                     state.clone(),
                     updated_input.clone(),
-                    natgraph::Change::default(),
                 )
             },
-            |(mut state, input, mut change)| {
-                natgraph::Program::update(&mut state, input, &mut change);
+            |(mut state, input)| {
+                natgraph::Program::update(&mut state, input);
             },
             BatchSize::SmallInput,
         )

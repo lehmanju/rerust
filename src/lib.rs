@@ -1,4 +1,4 @@
-use analysis::ReVisitor;
+use analysis::visitor::ReVisitor;
 use codegen::generate;
 use parser::ReBlock;
 use petgraph::dot::Dot;

@@ -4,7 +4,7 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::analysis::{
-    ChoiceNode, EvtNode, Family, FilterNode, FoldNode, MapNode, NameNode, ReEdge, ReNode, VarNode,
+    Family, NameNode, NodeData, ReEdge, ReNode,
 };
 use petgraph::{graph::NodeIndex, visit::Topo, Graph};
 
@@ -13,14 +13,12 @@ mod sources;
 
 pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut topo_visitor = Topo::new(graph);
-    let mut tks_change = TokenStream::new();
     let mut tks_state = TokenStream::new();
     let mut tks_function = TokenStream::new();
     let mut tks_update = TokenStream::new();
     let mut tks_observers = TokenStream::new();
     let mut tks_input_struct = TokenStream::new();
     let mut tks_notify = TokenStream::new();
-    let mut tks_default_state = TokenStream::new();
     let mut tks_card_structs = TokenStream::new();
     let mut tks_slots = TokenStream::new();
     let mut tks_sink_fn = TokenStream::new();
@@ -29,11 +27,12 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_take_all = TokenStream::new();
     let mut tks_slot_init = TokenStream::new();
     let mut tks_initial_input = TokenStream::new();
+	let mut tks_initialize = TokenStream::new();
+	let mut tks_initialize_struct = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_weights(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
         let tokens = weight.generate_interface(incoming);
-        tks_change.extend(tokens.change_struct);
         tks_card_structs.extend(tokens.card_struct);
         tks_slots.extend(tokens.slot_part);
         tks_sink_fn.extend(tokens.sink_fn);
@@ -43,12 +42,13 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_slot_init.extend(tokens.slot_init);
         tks_state.extend(tokens.state_struct);
         tks_input_struct.extend(tokens.input_struct_part);
-        tks_default_state.extend(tokens.state_default);
         tks_function.extend(tokens.functions);
         tks_update.extend(tokens.update_part);
         tks_notify.extend(tokens.notify_part);
         tks_observers.extend(tokens.observer_struct);
         tks_initial_input.extend(tokens.initial_input);
+		tks_initialize.extend(tokens.initialize);
+		tks_initialize_struct.extend(tokens.initialize_struct);
     }
     quote! {
         use std::rc::Rc;
@@ -56,24 +56,30 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::cell::RefCell;
         use std::sync::mpsc::*;
         use std::mem;
+        use if_chain::if_chain;
 
-        struct Group<T> {
+		#[derive(Clone)]
+        struct Variable<T> {
             value: T,
             change: bool,
+        }
+
+		#[derive(Clone)]
+        enum Event<T> {
+            Some(T),
+            None,
         }
 
         #[derive(Clone)]
         pub struct State {
             #tks_state
         }
-        #[derive(Default)]
-        pub struct Change {
-            #tks_change
-        }
+
         #[derive(Default)]
         struct Observers {
             #tks_observers
         }
+
         pub struct Program {
             state: State,
             observers: Observers,
@@ -103,6 +109,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         struct Slots {
             #tks_slots
         }
+
         impl Slots {
             fn new(data: Weak<Phantom>) -> Self {
                 Self {
@@ -149,12 +156,19 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             }
         }
 
+		impl Default for State {
+			fn default() -> Self {
+				#tks_initialize
+				State { #tks_initialize_struct }
+			}
+		}
+			
         impl Program {
-            pub fn update(state: &mut State, mut inputs: Input, change: &mut Change) {
+            pub fn update(state: &mut State, mut inputs: Input) {
                 #tks_update
             }
 
-            fn notify(observers: &mut Observers, changes: Change, state: &State) {
+            fn notify(observers: &mut Observers, state: &mut State) {
                 #tks_notify
             }
 
@@ -163,9 +177,8 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 let result = receiver.try_recv();
                 match result {
                     Ok(inputs) => {
-                        let mut changes = Change::default();
-                        Self::update(state, inputs, &mut changes);
-                        Self::notify(observers, changes, state);
+                        Self::update(state, inputs);
+                        Self::notify(observers, state);
                     }
                     Err(recv_error) => {
                         println!("Queue error: {:?}", recv_error);
@@ -173,10 +186,13 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 }
             }
 
+			pub fn init(&mut self) {
+				let Program { state, observers, receiver, sink } = self;
+				Self::notify(observers, state);
+			}
+
             pub fn new() -> Self {
                 let (send,recv) = channel();
-                let input = Input::initial();
-                send.send(input).unwrap();
                 Self {
                     state: State::default(),
                     observers: Observers::default(),
@@ -193,20 +209,12 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
             #tks_function
         }
-
-        impl Default for State {
-            fn default() -> Self {
-                Self {
-                    #tks_default_state
-                }
-            }
-        }
     }
 }
 fn get_incoming_weights<'ast>(
     graph: &'ast Graph<ReNode<'ast>, ReEdge>,
     idx: NodeIndex,
-) -> Vec<&'ast ReNode> {
+) -> Vec<&'ast ReNode<'ast>> {
     let incoming_nodes = graph.neighbors_directed(idx, petgraph::Incoming);
     let mut weights = Vec::new();
     for node_idx in incoming_nodes {
@@ -234,10 +242,22 @@ pub struct InterfaceTokens {
     pub functions: TokenStream,
     pub update_part: TokenStream,
     pub state_struct: TokenStream,
-    pub change_struct: TokenStream,
     pub observer_struct: TokenStream,
     pub notify_part: TokenStream,
-    pub state_default: TokenStream,
+	pub initialize: TokenStream,
+	pub initialize_struct: TokenStream,
+}
+
+pub fn change_prefix(ident: &Ident) -> Ident {
+    format_ident!("change_{}", ident)
+}
+
+pub fn temp_prefix(ident: &Ident) -> Ident {
+    format_ident!("temp_{}", ident)
+}
+
+pub fn val_prefix(ident: &Ident) -> Ident {
+    format_ident!("val_{}", ident)
 }
 
 #[enum_dispatch]
@@ -253,32 +273,61 @@ impl Generate for NameNode<'_> {
 
     fn generate_interface(&self, incoming: &Vec<&ReNode>) -> InterfaceTokens {
         let name = self.ident();
-        let ty = &self.ty;
+        let ty = self.ty();
         let ident = self.ident();
         let income = incoming[0].ident();
         let parent_node = incoming[0];
+        let pin = self.pin();
+        let family = self.family();
         let mut ift = InterfaceTokens::default();
-        ift.observer_struct = quote! {
-            #name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
-        };
-        let observer_ident = format_ident!("observe_{}", ident);
-        ift.functions = quote! {
-            pub fn #observer_ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
-                self.observers.#name.push(observer);
+
+        // save state and generate observers
+        if pin {
+            ift.observer_struct = quote! {
+                #name: Vec<Weak<RefCell<dyn FnMut(&#ty)>>>,
+            };
+            let observer_ident = format_ident!("observe_{}", ident);
+            ift.functions = quote! {
+                pub fn #observer_ident(&mut self, observer: Weak<RefCell<dyn FnMut(&#ty)>>) {
+                    self.observers.#name.push(observer);
+                }
+            };
+
+            match family {
+                Family::Event => {
+                    ift.notify_part = quote! {
+                        if let Event::Some(value) = &state.#income {
+                            observers.#ident.retain(|lst| {
+                                if let Some(cb) = Weak::upgrade(lst) {
+                                    (&mut *cb.borrow_mut())(value);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        }
+						state.#income = Event::None;
+                    };
+                }
+                Family::Variable => {
+                    ift.notify_part = quote! {
+                        if state.#income.change {
+                            observers.#ident.retain(|lst| {
+                                if let Some(cb) = Weak::upgrade(lst) {
+                                    (&mut *cb.borrow_mut())(&state.#income.value);
+                                    true
+                                } else {
+                                    false
+                                }
+                            });
+                        }
+						state.#income.change = false;
+                    };
+                }
             }
-        };
-        ift.notify_part = quote! {
-            if changes.#income {
-                observers.#ident.retain(|lst| {
-                    if let Some(cb) = Weak::upgrade(lst) {
-                        (&mut *cb.borrow_mut())(&state.#income);
-                        true
-                    } else {
-                        false
-                    }
-                });
-            }
-        };
+        }
+
+        // setters for sources
         match parent_node {
             ReNode::Var(_) | ReNode::Evt(_) => {
                 let input_fn_name = format_ident!("set_{}", name);

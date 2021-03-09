@@ -2,7 +2,7 @@ use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    token::{self, Let, OrOr, Semi},
+    token::{self, Let, Semi},
     Block, Error, Expr, Ident, Pat, PatType, Token, Type,
 };
 use token::{Comma, Paren, RArrow};
@@ -34,17 +34,9 @@ pub enum ReExpr {
     Ident(ReIdent),
     Group(GroupExpr),
     Fold(FoldExpr),
-    Choice(ChoiceExpr),
     Map(MapExpr),
     Filter(FilterExpr),
     Changed(ChangedExpr),
-}
-
-#[derive(Debug)]
-pub struct ChoiceExpr {
-    pub left_expr: Box<ReExpr>,
-    pub oror: OrOr,
-    pub right_expr: Box<ReExpr>,
 }
 
 #[derive(Debug)]
@@ -178,22 +170,7 @@ impl Parse for ReLocal {
 
 impl Parse for ReExpr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut method_call = parse_method(input)?;
-        while input.peek(Token![||]) {
-            let choice_token: Token![||] = input.parse()?;
-            let choice_expr = parse_method(input)?;
-            if let ReExpr::Group(groupexpr) = choice_expr {
-                return Err(Error::new(
-                    groupexpr.paren.span,
-                    "signal groups not allowed as input to choice",
-                ));
-            }
-            method_call = ReExpr::Choice(ChoiceExpr {
-                left_expr: Box::new(method_call),
-                oror: choice_token,
-                right_expr: Box::new(choice_expr),
-            })
-        }
+        let method_call = parse_method(input)?;
         Ok(method_call)
     }
 }
