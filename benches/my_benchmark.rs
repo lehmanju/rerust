@@ -241,9 +241,7 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
 }
 
 pub fn natural_graph_rerust(c: &mut Criterion) {
-    let mut state = natgraph::State::default();
-    let init = natgraph::Input::initial();
-    natgraph::Program::update(&mut state, init);
+    let state = natgraph::State::default();
     let mut updated_input = natgraph::Input::default();
     updated_input.set_source(1);
 
