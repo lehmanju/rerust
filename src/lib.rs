@@ -10,7 +10,7 @@ mod codegen;
 mod parser;
 
 #[proc_macro]
-pub fn rerust_gen(input: TokenStream) -> TokenStream {
+pub fn rerust(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as ReBlock);
     let mut visitor = ReVisitor::new();
     let result = visitor.visit_reblock(&input);

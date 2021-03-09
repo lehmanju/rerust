@@ -85,9 +85,14 @@ impl Generate for MapNode<'_> {
                     let #name = &#temp_name;
                 };
             } else {
+				ift.initialize = quote! {
+					let #temp_name = Self::#name(#method_args);
+					let #name = &#temp_name;
+				};
                 ift.update_part = quote! {
                     let #temp_name = Self::#name(#method_args);
                     let #name = &#temp_name;
+					let #change_name = true;
                 };
             }
         }
@@ -103,6 +108,7 @@ fn generate_condition(mut incoming: Vec<&ReNode>, family: Family) -> (TokenStrea
     if incoming.len() == 1 {
         let node = incoming[0];
         let name = node.ident();
+		let change_name = change_prefix(&name);
         let fam = node.family();
         let local_name = val_prefix(&name);
         if family == Family::Event && fam == Family::Variable {
@@ -114,12 +120,13 @@ fn generate_condition(mut incoming: Vec<&ReNode>, family: Family) -> (TokenStrea
                 quote! {},
             )
         } else {
-            (quote! {}, quote! { change.#name })
+            (quote! {}, quote! { #change_name })
         }
     } else {
         let node = incoming.pop().unwrap();
         let fam = node.family();
         let name = node.ident();
+		let change_name = change_prefix(&name);
         let local_name = val_prefix(&name);
         let (rest_events, rest_variables) = generate_condition(incoming, family);
         if family == Family::Event && fam == Family::Variable {
@@ -131,7 +138,7 @@ fn generate_condition(mut incoming: Vec<&ReNode>, family: Family) -> (TokenStrea
                 rest_variables,
             )
         } else {
-            (rest_events, quote! { change.#name || #rest_variables })
+            (rest_events, quote! { #change_name || #rest_variables })
         }
     }
 }

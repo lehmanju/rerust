@@ -43,11 +43,12 @@ impl<'ast> ReVisitor<'ast> {
                 "identifier already occupied",
             ));
         }
+		let last_len = last_idxs.len();
         let (last_idx, last_ty) = last_idxs.remove(0);
         let last_node = self.graph.node_weight_mut(last_idx).unwrap();
         let mut pin = false;
         if i.pin_token.is_some() {
-            if last_idxs.len() != 1 {
+            if last_len != 1 {
                 return Err(Error::new(
                     i.pin_token.unwrap().span,
                     "cannot pin group of reactives",

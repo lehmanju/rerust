@@ -158,8 +158,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
 		impl Default for State {
 			fn default() -> Self {
-				#tks_initialize
-				State { #tks_initialize_struct }
+				Program::default_state()
 			}
 		}
 			
@@ -171,6 +170,11 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             fn notify(observers: &mut Observers, state: &mut State) {
                 #tks_notify
             }
+
+			pub fn default_state() -> State {
+				#tks_initialize
+				State { #tks_initialize_struct }
+			}
 
             pub fn run(&mut self) {
                 let Program {state, observers, receiver, sink} = self;
