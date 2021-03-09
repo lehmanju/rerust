@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 
 mod natgraph {
-    use rerust::rerust_gen;
-    rerust_gen! {
+    use rerust::rerust;
+    rerust! {
         let source = Var::<i32>(0i32);
         let b1 = source.map(|v: &i32| -> i32 { v + 1 });
         let b2 = b1.map(|v: &i32| -> i32 { v + 1 });
@@ -258,12 +258,7 @@ pub fn natural_graph_rerust(c: &mut Criterion) {
 
     c.bench_function("natgraph_rerust", move |b| {
         b.iter_batched(
-            || {
-                (
-                    state.clone(),
-                    updated_input.clone(),
-                )
-            },
+            || (state.clone(), updated_input.clone()),
             |(mut state, input)| {
                 natgraph::Program::update(&mut state, input);
             },

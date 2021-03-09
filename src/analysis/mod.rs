@@ -16,6 +16,7 @@ pub struct ReData {
 
 #[enum_dispatch]
 pub trait NodeData {
+    fn outgoing_family(&self) -> Family;
     fn family(&self) -> Family;
     fn ty(&self) -> &Type;
     fn pin(&self) -> bool;
@@ -88,6 +89,9 @@ pub struct ReEdge {
 }
 
 impl NodeData for VarNode<'_> {
+    fn outgoing_family(&self) -> Family {
+        self.family()
+    }
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -110,6 +114,9 @@ impl NodeData for VarNode<'_> {
 }
 
 impl NodeData for EvtNode {
+    fn outgoing_family(&self) -> Family {
+        self.family()
+    }
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -132,6 +139,10 @@ impl NodeData for EvtNode {
 }
 
 impl NodeData for NameNode<'_> {
+    fn outgoing_family(&self) -> Family {
+        self.family()
+    }
+
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -154,6 +165,10 @@ impl NodeData for NameNode<'_> {
 }
 
 impl NodeData for FoldNode<'_> {
+    fn outgoing_family(&self) -> Family {
+        Family::Variable
+    }
+
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -176,6 +191,10 @@ impl NodeData for FoldNode<'_> {
 }
 
 impl NodeData for MapNode<'_> {
+    fn outgoing_family(&self) -> Family {
+        self.family()
+    }
+
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -198,6 +217,10 @@ impl NodeData for MapNode<'_> {
 }
 
 impl NodeData for FilterNode<'_> {
+    fn outgoing_family(&self) -> Family {
+        self.family()
+    }
+
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -220,6 +243,10 @@ impl NodeData for FilterNode<'_> {
 }
 
 impl NodeData for ChangedNode {
+    fn outgoing_family(&self) -> Family {
+        Family::Event
+    }
+
     fn family(&self) -> Family {
         self.data.family()
     }
@@ -242,6 +269,9 @@ impl NodeData for ChangedNode {
 }
 
 impl NodeData for ReData {
+    fn outgoing_family(&self) -> Family {
+        self.family()
+    }
     fn family(&self) -> Family {
         self.family
     }

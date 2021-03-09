@@ -3,9 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use quote::quote;
 
-use crate::analysis::{
-    Family, NameNode, NodeData, ReEdge, ReNode,
-};
+use crate::analysis::{Family, NameNode, NodeData, ReEdge, ReNode};
 use petgraph::{graph::NodeIndex, visit::Topo, Graph};
 
 mod reactives;
@@ -26,9 +24,8 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_slot_check = quote! {true};
     let mut tks_take_all = TokenStream::new();
     let mut tks_slot_init = TokenStream::new();
-    let mut tks_initial_input = TokenStream::new();
-	let mut tks_initialize = TokenStream::new();
-	let mut tks_initialize_struct = TokenStream::new();
+    let mut tks_initialize = TokenStream::new();
+    let mut tks_initialize_struct = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_weights(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
@@ -46,9 +43,8 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_update.extend(tokens.update_part);
         tks_notify.extend(tokens.notify_part);
         tks_observers.extend(tokens.observer_struct);
-        tks_initial_input.extend(tokens.initial_input);
-		tks_initialize.extend(tokens.initialize);
-		tks_initialize_struct.extend(tokens.initialize_struct);
+        tks_initialize.extend(tokens.initialize);
+        tks_initialize_struct.extend(tokens.initialize_struct);
     }
     quote! {
         use std::rc::Rc;
@@ -58,13 +54,13 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         use std::mem;
         use if_chain::if_chain;
 
-		#[derive(Clone)]
+        #[derive(Clone)]
         struct Variable<T> {
             value: T,
             change: bool,
         }
 
-		#[derive(Clone)]
+        #[derive(Clone)]
         enum Event<T> {
             Some(T),
             None,
@@ -93,11 +89,6 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         }
 
         impl Input {
-            pub fn initial() -> Self {
-                Self {
-                    #tks_initial_input
-                }
-            }
             #tks_input_fn
         }
 
@@ -156,12 +147,12 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             }
         }
 
-		impl Default for State {
-			fn default() -> Self {
-				Program::default_state()
-			}
-		}
-			
+        impl Default for State {
+            fn default() -> Self {
+                Program::default_state()
+            }
+        }
+
         impl Program {
             pub fn update(state: &mut State, mut inputs: Input) {
                 #tks_update
@@ -171,10 +162,10 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 #tks_notify
             }
 
-			pub fn default_state() -> State {
-				#tks_initialize
-				State { #tks_initialize_struct }
-			}
+            pub fn default_state() -> State {
+                #tks_initialize
+                State { #tks_initialize_struct }
+            }
 
             pub fn run(&mut self) {
                 let Program {state, observers, receiver, sink} = self;
@@ -190,10 +181,10 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
                 }
             }
 
-			pub fn init(&mut self) {
-				let Program { state, observers, receiver, sink } = self;
-				Self::notify(observers, state);
-			}
+            pub fn init(&mut self) {
+                let Program { state, observers, receiver, sink } = self;
+                Self::notify(observers, state);
+            }
 
             pub fn new() -> Self {
                 let (send,recv) = channel();
@@ -242,14 +233,13 @@ pub struct InterfaceTokens {
     pub check_input: TokenStream,
     pub take_all: TokenStream,
     pub slot_init: TokenStream,
-    pub initial_input: TokenStream,
     pub functions: TokenStream,
     pub update_part: TokenStream,
     pub state_struct: TokenStream,
     pub observer_struct: TokenStream,
     pub notify_part: TokenStream,
-	pub initialize: TokenStream,
-	pub initialize_struct: TokenStream,
+    pub initialize: TokenStream,
+    pub initialize_struct: TokenStream,
 }
 
 pub fn change_prefix(ident: &Ident) -> Ident {
@@ -310,7 +300,7 @@ impl Generate for NameNode<'_> {
                                 }
                             });
                         }
-						state.#income = Event::None;
+                        state.#income = Event::None;
                     };
                 }
                 Family::Variable => {
@@ -325,7 +315,7 @@ impl Generate for NameNode<'_> {
                                 }
                             });
                         }
-						state.#income.change = false;
+                        state.#income.change = false;
                     };
                 }
             }

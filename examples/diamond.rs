@@ -1,13 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
 mod generated {
-    use rerust::rerust_gen;
+    use rerust::rerust;
 
-    rerust_gen! {
+    rerust! {
         let x = Var::<u32>(1u32);
         let y = x.map(|x: &u32| -> u32 {x * 2});
         let z = x.map(|x: &u32| -> u32 {x * 3});
-        let t = (y,z).map(|y: &u32, z: &u32| -> u32 {y + z});
+        let pin t = (y,z).map(|y: &u32, z: &u32| -> u32 {y + z});
     }
 }
 
@@ -19,6 +19,7 @@ fn main() {
     prog.observe_t(Rc::downgrade(&observer));
 
     sink.send_x(2);
+    prog.init();
     for _ in 0..5 {
         prog.run();
     }

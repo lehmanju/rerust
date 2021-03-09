@@ -7,8 +7,8 @@ use petgraph::{graph::NodeIndex, Graph};
 use syn::{Error, Result, Type};
 
 use super::{
-    ChangedNode, EvtNode, Family, FilterNode, FoldNode, MapNode, NameNode, NodeData,
-    ReData, ReEdge, ReNode, VarNode,
+    ChangedNode, EvtNode, Family, FilterNode, FoldNode, MapNode, NameNode, NodeData, ReData,
+    ReEdge, ReNode, VarNode,
 };
 
 pub struct ReVisitor<'ast> {
@@ -43,11 +43,10 @@ impl<'ast> ReVisitor<'ast> {
                 "identifier already occupied",
             ));
         }
-		let last_len = last_idxs.len();
+        let last_len = last_idxs.len();
         let (last_idx, last_ty) = last_idxs.remove(0);
         let last_node = self.graph.node_weight_mut(last_idx).unwrap();
-        let mut pin = false;
-        if i.pin_token.is_some() {
+        let pin = if i.pin_token.is_some() {
             if last_len != 1 {
                 return Err(Error::new(
                     i.pin_token.unwrap().span,
@@ -60,9 +59,13 @@ impl<'ast> ReVisitor<'ast> {
                     "pin original signal instead",
                 ));
             }
-            pin = true;
             *last_node.pin_mut() = true;
-        }
+            true
+        } else if last_node.pin() {
+            true
+        } else {
+            false
+        };
         let name_node = NameNode {
             id: name,
             data: ReData {
@@ -112,7 +115,7 @@ impl<'ast> ReVisitor<'ast> {
             ReExpr::Evt(evtexpr) => {
                 let node = ReNode::Evt(EvtNode {
                     data: ReData {
-                        pin: false,
+                        pin: true,
                         ty: evtexpr.ty.clone(),
                         id: self.next_idx(),
                         family: Family::Event,
@@ -152,7 +155,7 @@ impl<'ast> ReVisitor<'ast> {
                 });
                 let idx = self.graph.add_node(node);
                 for (node, ty) in incoming {
-                    let edge = ReEdge { ty: ty.clone()};
+                    let edge = ReEdge { ty: ty.clone() };
                     self.graph.add_edge(node, idx, edge);
                 }
                 Ok((vec![(idx, ty)], Family::Variable))
@@ -181,7 +184,7 @@ impl<'ast> ReVisitor<'ast> {
                 let (mut incoming, incoming_fam) = self.visit_reexpr(&filterexpr.left_expr)?;
                 self.visit_reclosure(&filterexpr.closure)?;
                 let (idx, ty) = incoming.remove(0); //first node is output type
-				let node_fam = self.graph.node_weight(idx).unwrap().family();
+                let node_fam = self.graph.node_weight(idx).unwrap().family();
                 if incoming_fam != Family::Event || node_fam != Family::Event {
                     return Err(Error::new(
                         filterexpr.filter_token.span,
@@ -212,8 +215,8 @@ impl<'ast> ReVisitor<'ast> {
                         "changed only valid on variables",
                     ));
                 }
-				let incoming = self.graph.node_weight_mut(idx).unwrap();
-				*incoming.pin_mut() = true;
+                let incoming = self.graph.node_weight_mut(idx).unwrap();
+                *incoming.pin_mut() = true;
                 let node = ReNode::Changed(ChangedNode {
                     data: ReData {
                         pin: false,

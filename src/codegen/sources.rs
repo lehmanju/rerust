@@ -4,7 +4,7 @@ use quote::quote;
 
 use crate::analysis::{EvtNode, NodeData, ReNode, VarNode};
 
-use super::{change_prefix, Generate, InterfaceTokens, temp_prefix};
+use super::{change_prefix, temp_prefix, Generate, InterfaceTokens};
 
 impl Generate for VarNode<'_> {
     fn generate_interface(&self, _: &Vec<&ReNode>) -> InterfaceTokens {
@@ -13,7 +13,7 @@ impl Generate for VarNode<'_> {
         let initial_state = self.initial;
         let mut ift = InterfaceTokens::default();
         let change_name = change_prefix(&name);
-		let temp_name = temp_prefix(&name);
+        let temp_name = temp_prefix(&name);
 
         ift.update_part = quote! {
             if let Some(val) = inputs.#name {
@@ -34,17 +34,13 @@ impl Generate for VarNode<'_> {
 
         ift.initialize = quote! {
             let #temp_name = Variable { value: #initial_state, change: true };
-			let #name = &#temp_name.value;
+            let #name = &#temp_name.value;
         };
 
-		ift.initialize_struct = quote! {
-			#name: #temp_name,
-		};
-		
-        let init = self.initial;
-        ift.initial_input = quote! {
-            #name: Some(#init),
+        ift.initialize_struct = quote! {
+            #name: #temp_name,
         };
+
         ift
     }
 
