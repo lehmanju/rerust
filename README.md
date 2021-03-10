@@ -1,5 +1,4 @@
 # Rerust
-**NOT YET PUBLISHED**
 
 This is the source code for *ReRust*, a functional reactive programming language (FRP) that provides dataflow programming in Rust.
 
@@ -9,7 +8,7 @@ To get started, install the Rust toolchain and add following line to your `Cargo
 
 ```Toml
 [dependencies]
-rerust = "1.0"
+rerust = "0.1.0"
 ```
 
 *ReRust* uses procedural macros to generate native Rust code. Each macro invocation should be placed inside a separate module to avoid name conflicts. Look at `examples/chat.rs` and `examples/diamond.rs` to get some inspiration.
@@ -57,3 +56,4 @@ Afterwards you can use as many instances of your program as you would like. To u
 - **Map**: Maps (multiple) reactives to a new output reactive by calling the provided closure on their values. Available for *Events* and *Variables*. If at least one *Event* is present as input, Map will be an *Event* reactive as well.
 - **Fold**: Takes at least one *Event* and any number of *Variables* as input and is of type *Variable*. Accumulates a value over time.
 - **Changed**: Takes exactly one *Variable* and transforms it into an *Event*, firing only if the incoming reactive has changed.
+- **Filter**: Filters events from an *Event* stream. Can depend on additional *Variables* for decision making. If the closure returns true, the event is forwarded, otherwise no event is fired.
