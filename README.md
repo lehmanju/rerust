@@ -57,3 +57,7 @@ Afterwards you can use as many instances of your program as you would like. To u
 - **Fold**: Takes at least one *Event* and any number of *Variables* as input and is of type *Variable*. Accumulates a value over time.
 - **Changed**: Takes exactly one *Variable* and transforms it into an *Event*, firing only if the incoming reactive has changed.
 - **Filter**: Filters events from an *Event* stream. Can depend on additional *Variables* for decision making. If the closure returns true, the event is forwarded, otherwise no event is fired.
+
+## Benchmarks
+
+*ReRust* has some predefined benchmarks available in `benches/`. To run them all type `cargo bench`.
