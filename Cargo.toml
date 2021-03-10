@@ -23,7 +23,11 @@ if_chain = "1.0"
 criterion = "0.3"
 
 [[bench]]
-name = "my_benchmark"
+name = "natgraph"
+harness = false
+
+[[bench]]
+name = "line"
 harness = false
 
 [lib]

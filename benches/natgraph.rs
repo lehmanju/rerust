@@ -32,9 +32,9 @@ mod var {
 }
 
 mod evt {
-	use rerust::rerust;
-	rerust! {
-		let source = Evt::<i32>();
+    use rerust::rerust;
+    rerust! {
+        let source = Evt::<i32>();
         let b1 = source.map(|v: &i32| -> i32 { v + 1 });
         let b2 = b1.map(|v: &i32| -> i32 { v + 1 });
         let b3 = b2.map(|v: &i32| -> i32 { v + 1 });
@@ -59,7 +59,7 @@ mod evt {
         let pin e5 = (e4,c2).map(|a: &i32, b: &i32| -> i32 { *a + *b });
         let e6 = c2.map(|v: &i32| -> i32 { v + 1 });
         let pin e7 = (e6,d1).map(|a: &i32, b: &i32| -> i32 { *a + *b });
-	}
+    }
 }
 
 #[derive(Default, Clone)]
@@ -303,7 +303,6 @@ pub fn natural_graph_rerust_evt(c: &mut Criterion) {
     });
 }
 
-
 pub fn natural_graph_manual_options(c: &mut Criterion) {
     let mut state = State::default();
     let mut change = Change::default();
@@ -323,80 +322,96 @@ pub fn natural_graph_manual_options(c: &mut Criterion) {
 
 #[derive(Clone)]
 struct ManualStackState {
-	c1: i32,
-	c5: i32,
-	e5: i32,
-	e7: i32,
+    c1: i32,
+    c5: i32,
+    e5: i32,
+    e7: i32,
 }
 
 #[derive(Clone)]
 struct ManualStackChange {
-	c1: bool,
-	c5: bool,
-	e5: bool,
-	e7: bool,
+    c1: bool,
+    c5: bool,
+    e5: bool,
+    e7: bool,
 }
 
-fn manual_stack(value: i32, state: &mut ManualStackState, change: &mut ManualStackChange){
-	if value != state.c1 {
-		state.c1 = value;
-		change.c1 = true;
-		let c1 = state.c1;
-		let b1 = c1 + 1;
-		let b2 = b1 + 1;
-		let b3 = b2 + 1;
-		let c2 = b3 + 1;
-		let c3 = c2 - c2;
-		let c4 = c3 + 1;
-		let a1 = b2 + 1;
-		let a2 = a1 + 1;
-		let a3 = a2 + b2;
-		let a4 = a3 + 1;
-		let b4 = a4 + b3;
-		let b5 = b4 + 1;
-		let b6 = b5 + 1;
-		let b7 = b6 + 1;
-		let b8 = b7 + c2;
-		let c5 = c4 + b8;
-		let d1 = c2 + 1;
-		let e1 = c1 - c1;
-		let e2 = e1 +1;
-		let e3 = e2 + 1;
-		let e4 = e3 + 1;
-		let e5 = e4 + c2;
-		let e6 = c2 + 1;
-		let e7 = e6 + d1;
-		if c5 != state.c5 {
-			state.c5 = c5;
-			change.c5 = true;
-		}
-		if e5 != state.e5 {
-			state.e5 = e5;
-			change.e5 = true;
-		}
-		if e7 != state.e7 {
-			state.e7 = e7;
-			change.e7 = true;
-		}
-	}
+fn manual_stack(value: i32, state: &mut ManualStackState, change: &mut ManualStackChange) {
+    if value != state.c1 {
+        state.c1 = value;
+        change.c1 = true;
+        let c1 = state.c1;
+        let b1 = c1 + 1;
+        let b2 = b1 + 1;
+        let b3 = b2 + 1;
+        let c2 = b3 + 1;
+        let c3 = c2 - c2;
+        let c4 = c3 + 1;
+        let a1 = b2 + 1;
+        let a2 = a1 + 1;
+        let a3 = a2 + b2;
+        let a4 = a3 + 1;
+        let b4 = a4 + b3;
+        let b5 = b4 + 1;
+        let b6 = b5 + 1;
+        let b7 = b6 + 1;
+        let b8 = b7 + c2;
+        let c5 = c4 + b8;
+        let d1 = c2 + 1;
+        let e1 = c1 - c1;
+        let e2 = e1 + 1;
+        let e3 = e2 + 1;
+        let e4 = e3 + 1;
+        let e5 = e4 + c2;
+        let e6 = c2 + 1;
+        let e7 = e6 + d1;
+        if c5 != state.c5 {
+            state.c5 = c5;
+            change.c5 = true;
+        }
+        if e5 != state.e5 {
+            state.e5 = e5;
+            change.e5 = true;
+        }
+        if e7 != state.e7 {
+            state.e7 = e7;
+            change.e7 = true;
+        }
+    }
 }
 
 pub fn natural_graph_manual_stack(c: &mut Criterion) {
-	let mut state = ManualStackState { c1: 0, c5: 0, e5: 0, e7: 0 };
-	let change = ManualStackChange { c1: false, c5: false, e5: false, e7: false };
-	manual_stack(1, &mut state, &mut change.clone());
-	manual_stack(0, &mut state, &mut change.clone());
+    let mut state = ManualStackState {
+        c1: 0,
+        c5: 0,
+        e5: 0,
+        e7: 0,
+    };
+    let change = ManualStackChange {
+        c1: false,
+        c5: false,
+        e5: false,
+        e7: false,
+    };
+    manual_stack(1, &mut state, &mut change.clone());
+    manual_stack(0, &mut state, &mut change.clone());
 
-	c.bench_function("natgraph_manual_stack", move |b| {
-		b.iter_batched(
-			|| (state.clone(), change.clone()),
-			|(mut state, mut change)| {
-				manual_stack(black_box(1), &mut state, &mut change);
-			},
-			BatchSize::SmallInput,
-		);
-	});
+    c.bench_function("natgraph_manual_stack", move |b| {
+        b.iter_batched(
+            || (state.clone(), change.clone()),
+            |(mut state, mut change)| {
+                manual_stack(black_box(1), &mut state, &mut change);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
-criterion_group!(benches, natural_graph_rerust_var, natural_graph_rerust_evt, natural_graph_manual_options, natural_graph_manual_stack);
+criterion_group!(
+    benches,
+    natural_graph_rerust_var,
+    natural_graph_rerust_evt,
+    natural_graph_manual_options,
+    natural_graph_manual_stack
+);
 criterion_main!(benches);
