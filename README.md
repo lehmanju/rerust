@@ -35,17 +35,17 @@ Afterwards you can use as many instances of your program as you would like. To u
     let mut prog = generated::Program::new();
     let mut sink = prog.sink();
 
-	// register observer, takes reference of t's type
+    // register observer, takes reference of t's type
     let observer = Rc::new(RefCell::new(observer_cb)) as Rc<_>;
     prog.observe_t(Rc::downgrade(&observer));
 
-	// update x value
+    // update x value
     sink.send_x(2);
    
     // initialize program and call observers with initial values
-	prog.init();
+    prog.init();
     for _ in 0..5 {
-		// check for new input, udpate state and notify observers
+	// check for new input, udpate state and notify observers
         prog.run();
     }
 ```
