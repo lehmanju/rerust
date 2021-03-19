@@ -1,7 +1,6 @@
 use analysis::visitor::ReVisitor;
 use codegen::generate;
 use parser::ReBlock;
-use petgraph::dot::Dot;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
@@ -18,6 +17,5 @@ pub fn rerust(input: TokenStream) -> TokenStream {
         return result.unwrap_err().to_compile_error().into();
     }
     let graph = visitor.reactive_graph();
-    //println!("{:#?}", Dot::new(&graph));
     generate(&graph).into()
 }
