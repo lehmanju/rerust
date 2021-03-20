@@ -30,6 +30,10 @@ harness = false
 name = "line"
 harness = false
 
+[[bench]]
+name = "pin"
+harness = false
+
 [lib]
 proc-macro = true
 

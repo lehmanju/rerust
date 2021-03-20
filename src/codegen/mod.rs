@@ -26,6 +26,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
     let mut tks_slot_init = TokenStream::new();
     let mut tks_initialize = TokenStream::new();
     let mut tks_initialize_struct = TokenStream::new();
+    let mut tks_observer_init = TokenStream::new();
     while let Some(nodeidx) = topo_visitor.next(graph) {
         let incoming = &get_incoming_weights(graph, nodeidx);
         let weight = graph.node_weight(nodeidx).expect("expect valid node index");
@@ -45,6 +46,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_observers.extend(tokens.observer_struct);
         tks_initialize.extend(tokens.initialize);
         tks_initialize_struct.extend(tokens.initialize_struct);
+        tks_observer_init.extend(tokens.initialize_observers);
     }
     quote! {
         use std::rc::Rc;
@@ -183,6 +185,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
             pub fn init(&mut self) {
                 let Program { state, observers, receiver, sink } = self;
+                #tks_observer_init
                 Self::notify(observers, state);
             }
 
@@ -240,6 +243,7 @@ pub struct InterfaceTokens {
     pub notify_part: TokenStream,
     pub initialize: TokenStream,
     pub initialize_struct: TokenStream,
+    pub initialize_observers: TokenStream,
 }
 
 pub fn change_prefix(ident: &Ident) -> Ident {

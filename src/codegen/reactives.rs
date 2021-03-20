@@ -62,8 +62,11 @@ impl Generate for MapNode<'_> {
                     let #change_name = state.#name.change;
                 };
                 ift.initialize = quote! {
-                    let #temp_name = Variable { value: Self::#name(#method_args), change: true };
+                    let #temp_name = Variable { value: Self::#name(#method_args), change: false };
                     let #name = &#temp_name.value;
+                };
+                ift.initialize_observers = quote! {
+                    state.#name.change = true;
                 };
                 ift.initialize_struct = quote! {
                     #name: #temp_name,
@@ -211,8 +214,11 @@ impl Generate for FoldNode<'_> {
 
         let init_expr = self.initial;
         ift.initialize = quote! {
-            let #temp_name = Variable { value: #init_expr, change: true };
+            let #temp_name = Variable { value: #init_expr, change: false };
             let #name = &#temp_name.value;
+        };
+        ift.initialize_observers = quote! {
+            state.#name.change = true;
         };
         ift.initialize_struct = quote! {
             #name: #temp_name,

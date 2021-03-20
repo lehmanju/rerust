@@ -33,8 +33,12 @@ impl Generate for VarNode<'_> {
         };
 
         ift.initialize = quote! {
-            let #temp_name = Variable { value: #initial_state, change: true };
+            let #temp_name = Variable { value: #initial_state, change: false };
             let #name = &#temp_name.value;
+        };
+
+        ift.initialize_observers = quote! {
+            state.#name.change = true;
         };
 
         ift.initialize_struct = quote! {
