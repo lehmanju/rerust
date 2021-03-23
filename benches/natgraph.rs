@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion, Throughput};
 
 mod var {
     use rerust::rerust;
@@ -271,55 +271,6 @@ fn natgraph_manual(value: i32, state: &mut State, change: &mut Change) {
     }
 }
 
-pub fn natural_graph_rerust_var(c: &mut Criterion) {
-    let state = var::State::default();
-    let mut updated_input = var::Input::default();
-    updated_input.set_source(1);
-
-    c.bench_function("natgraph_rerust_var", move |b| {
-        b.iter_batched(
-            || (state.clone(), updated_input.clone()),
-            |(mut state, input)| {
-                var::Program::update(&mut state, input);
-            },
-            BatchSize::SmallInput,
-        )
-    });
-}
-
-pub fn natural_graph_rerust_evt(c: &mut Criterion) {
-    let state = evt::State::default();
-    let mut updated_input = evt::Input::default();
-    updated_input.set_source(1);
-
-    c.bench_function("natgraph_rerust_evt", move |b| {
-        b.iter_batched(
-            || (state.clone(), updated_input.clone()),
-            |(mut state, input)| {
-                evt::Program::update(&mut state, input);
-            },
-            BatchSize::SmallInput,
-        )
-    });
-}
-
-pub fn natural_graph_manual_options(c: &mut Criterion) {
-    let mut state = State::default();
-    let mut change = Change::default();
-    natgraph_manual(1, &mut state, &mut change);
-    natgraph_manual(0, &mut state, &mut change);
-
-    c.bench_function("natgraph_manual_options", move |b| {
-        b.iter_batched(
-            || (state.clone(), change.clone()),
-            |(mut state, mut change)| {
-                natgraph_manual(black_box(1), &mut state, &mut change);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
 #[derive(Clone)]
 struct ManualStackState {
     c1: i32,
@@ -380,7 +331,53 @@ fn manual_stack(value: i32, state: &mut ManualStackState, change: &mut ManualSta
     }
 }
 
-pub fn natural_graph_manual_stack(c: &mut Criterion) {
+pub fn natural_graph_rerust_var(c: &mut Criterion) {
+    let state = var::State::default();
+    let mut updated_input = var::Input::default();
+    updated_input.set_source(1);
+
+    let mut group = c.benchmark_group("natgraph");
+    group.throughput(Throughput::Elements(1));
+
+    group.bench_function("rerust-var", move |b| {
+        b.iter_batched(
+            || (state.clone(), updated_input.clone()),
+            |(mut state, input)| {
+                var::Program::update(&mut state, input);
+            },
+            BatchSize::SmallInput,
+        )
+    });
+
+    let state = evt::State::default();
+    let mut updated_input = evt::Input::default();
+    updated_input.set_source(1);
+
+    group.bench_function("rerust-evt", move |b| {
+        b.iter_batched(
+            || (state.clone(), updated_input.clone()),
+            |(mut state, input)| {
+                evt::Program::update(&mut state, input);
+            },
+            BatchSize::SmallInput,
+        )
+    });
+
+    let mut state = State::default();
+    let mut change = Change::default();
+    natgraph_manual(1, &mut state, &mut change);
+    natgraph_manual(0, &mut state, &mut change);
+
+    group.bench_function("manual-options", move |b| {
+        b.iter_batched(
+            || (state.clone(), change.clone()),
+            |(mut state, mut change)| {
+                natgraph_manual(black_box(1), &mut state, &mut change);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
     let mut state = ManualStackState {
         c1: 0,
         c5: 0,
@@ -396,7 +393,7 @@ pub fn natural_graph_manual_stack(c: &mut Criterion) {
     manual_stack(1, &mut state, &mut change.clone());
     manual_stack(0, &mut state, &mut change.clone());
 
-    c.bench_function("natgraph_manual_stack", move |b| {
+    group.bench_function("manual-stack", move |b| {
         b.iter_batched(
             || (state.clone(), change.clone()),
             |(mut state, mut change)| {
@@ -407,11 +404,5 @@ pub fn natural_graph_manual_stack(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    benches,
-    natural_graph_rerust_var,
-    natural_graph_rerust_evt,
-    natural_graph_manual_options,
-    natural_graph_manual_stack
-);
+criterion_group!(benches, natural_graph_rerust_var,);
 criterion_main!(benches);

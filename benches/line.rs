@@ -65,7 +65,7 @@ pub fn manual_line(c: &mut Criterion) {
     manual(1, &mut state, &mut change.clone());
     manual(0, &mut state, &mut change.clone());
 
-    let mut group = c.benchmark_group("manual-line");
+    let mut group = c.benchmark_group("chain");
     group.throughput(Throughput::Elements(1));
 
     group.bench_function("manual", move |b| {
@@ -77,17 +77,12 @@ pub fn manual_line(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
-}
-
-pub fn rerust_line(c: &mut Criterion) {
-    let mut group = c.benchmark_group("rerust-line");
-    group.throughput(Throughput::Elements(1));
 
     let state = var::State::default();
     let mut updated_input = var::Input::default();
     updated_input.set_source(1);
 
-    group.bench_function("var", move |b| {
+    group.bench_function("rerust-var", move |b| {
         b.iter_batched(
             || (state.clone(), updated_input.clone()),
             |(mut state, input)| {
@@ -101,7 +96,7 @@ pub fn rerust_line(c: &mut Criterion) {
     let mut updated_input = evt::Input::default();
     updated_input.set_source(1);
 
-    group.bench_function("evt", move |b| {
+    group.bench_function("rerust-evt", move |b| {
         b.iter_batched(
             || (state.clone(), updated_input.clone()),
             |(mut state, input)| {
@@ -112,5 +107,5 @@ pub fn rerust_line(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, manual_line, rerust_line);
+criterion_group!(benches, manual_line);
 criterion_main!(benches);

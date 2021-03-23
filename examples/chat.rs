@@ -30,7 +30,8 @@ fn main() {
     sink.send_name(format!("Bob"));
     sink.send_text(format!("Hi Alice, nice to meet you!"));
     sink.send_index(1);
-    for _ in 0..6 {
+    //    for _ in 0..6 {
+    loop {
         prog.run();
     }
 }
