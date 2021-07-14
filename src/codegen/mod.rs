@@ -49,12 +49,14 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         tks_observer_init.extend(tokens.initialize_observers);
     }
     quote! {
-        use std::rc::Rc;
-        use std::rc::Weak;
-        use std::cell::RefCell;
-        use std::sync::mpsc::*;
-        use std::mem;
+        extern crate alloc;
+
+        use alloc::rc::Rc;
+        use alloc::rc::Weak;
+        use core::cell::RefCell;
         use if_chain::if_chain;
+        use alloc::collections::vec_deque::VecDeque;
+        use alloc::vec::Vec;
 
         #[derive(Clone)]
         struct Variable<T> {
@@ -81,8 +83,7 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
         pub struct Program {
             state: State,
             observers: Observers,
-            receiver: Receiver<Input>,
-            sink: Sink,
+            buffer: Rc<RefCell<VecDeque<Input>>>,
         }
 
         #[derive(Default, Clone)]
@@ -92,61 +93,6 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
 
         impl Input {
             #tks_input_fn
-        }
-
-        struct Phantom {}
-
-        #tks_card_structs
-
-        #[derive(Default)]
-        struct Slots {
-            #tks_slots
-        }
-
-        impl Slots {
-            fn new(data: Weak<Phantom>) -> Self {
-                Self {
-                #tks_slot_init
-                }
-            }
-        }
-
-        pub struct Sink {
-            slots: Slots,
-            channel_sender: Sender<Input>,
-            id: Rc<Phantom>,
-        }
-
-        impl Clone for Sink {
-            fn clone(&self) -> Self {
-                Self { slots: Slots::default(), channel_sender: self.channel_sender.clone(), id: self.id.clone()}
-            }
-        }
-
-        impl Sink {
-            #tks_sink_fn
-
-            pub fn take_all(&mut self, other: &mut Self) {
-                #tks_take_all
-            }
-
-            pub fn send(&mut self, input: Input) {
-                if #tks_slot_check
-                {
-                    self.channel_sender.send(input).unwrap();
-                } else
-                {
-                    panic!("Slot empty or from another program instance");
-                }
-            }
-            fn new(sender: Sender<Input>) -> Self {
-                let id = Rc::new(Phantom {});
-                Self {
-                    slots: Slots::new(Rc::downgrade(&id)),
-                    channel_sender: sender,
-                    id,
-                }
-            }
         }
 
         impl Default for State {
@@ -170,39 +116,33 @@ pub fn generate(graph: &Graph<ReNode, ReEdge>) -> TokenStream {
             }
 
             pub fn run(&mut self) {
-                let Program {state, observers, receiver, sink} = self;
-                let result = receiver.try_recv();
+                let Program {state, observers, buffer} = self;
+                let result = buffer.borrow_mut().pop_front();
                 match result {
-                    Ok(inputs) => {
+                    Some(inputs) => {
                         Self::update(state, inputs);
                         Self::notify(observers, state);
                     }
-                    Err(recv_error) => {
-                        println!("Queue error: {:?}", recv_error);
-                    }
+                    None => {}
                 }
             }
 
             pub fn init(&mut self) {
-                let Program { state, observers, receiver, sink } = self;
+                let Program { state, observers, buffer } = self;
                 #tks_observer_init
                 Self::notify(observers, state);
             }
 
             pub fn new() -> Self {
-                let (send,recv) = channel();
                 Self {
                     state: State::default(),
                     observers: Observers::default(),
-                    receiver: recv,
-                    sink: Sink::new(send),
+                    buffer: Rc::new(RefCell::new(VecDeque::new())),
                 }
             }
 
-            pub fn sink(&mut self) -> Sink {
-                let mut new_sink = self.sink.clone();
-                new_sink.take_all(&mut self.sink);
-                new_sink
+            pub fn sink(&self) -> Rc<RefCell<VecDeque<Input>>> {
+                self.buffer.clone()
             }
 
             #tks_function

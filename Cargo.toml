@@ -9,9 +9,6 @@ description = "Reactive programming with dataflow semantics"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures-signals = "0.3"
-futures = { version = "0.3", features = ["thread-pool"] }
-carboxyl = "0.2"
 petgraph = "0.5"
 syn = { version = "1.0", features = [ "full", "parsing", "extra-traits", "visit" ] }
 quote = "1.0"

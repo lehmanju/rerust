@@ -1,4 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+#![no_std]
+#![feature(alloc)]
+
+extern crate alloc;
+use alloc::rc::Rc;
+use alloc::vec;
+use core::cell::RefCell;
 
 mod generated {
     use rerust::rerust;

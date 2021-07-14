@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+extern crate alloc;
+use alloc::collections::vec_deque::VecDeque;
+use alloc::rc::Rc;
+use core::cell::RefCell;
 
 mod generated {
     use rerust::rerust;
@@ -13,12 +16,13 @@ mod generated {
 
 fn main() {
     let mut prog = generated::Program::new();
-    let mut sink = prog.sink();
+    let sink: Rc<RefCell<VecDeque<generated::Input>>> = prog.sink();
 
     let observer = Rc::new(RefCell::new(observer_cb)) as Rc<_>;
     prog.observe_t(Rc::downgrade(&observer));
 
-    sink.send_x(2);
+    sink.borrow_mut()
+        .push_back(generated::Input { var_0: Some(8u32) });
     prog.init();
     for _ in 0..5 {
         prog.run();
@@ -26,5 +30,5 @@ fn main() {
 }
 
 fn observer_cb(t: &u32) {
-    println!("t: {:?}", t);
+    println!("observer {}", t)
 }

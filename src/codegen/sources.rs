@@ -29,7 +29,7 @@ impl Generate for VarNode<'_> {
         };
 
         ift.input_struct_part = quote! {
-            #name: Option<#ty>,
+            pub #name: Option<#ty>,
         };
 
         ift.initialize = quote! {

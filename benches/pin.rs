@@ -100,7 +100,7 @@ pub fn rerust_expensive(c: &mut Criterion) {
 
     let mut state = pin::State::default();
     let mut updated_input = pin::Input::default();
-	
+
     group.bench_function("pin", move |b| {
         b.iter_batched(
             || (state.clone(), updated_input.clone()),

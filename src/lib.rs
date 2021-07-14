@@ -17,5 +17,7 @@ pub fn rerust(input: TokenStream) -> TokenStream {
         return result.unwrap_err().to_compile_error().into();
     }
     let graph = visitor.reactive_graph();
-    generate(&graph).into()
+    let code = generate(&graph).into();
+    println!("{}", code);
+    code
 }
