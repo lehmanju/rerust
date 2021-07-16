@@ -18,6 +18,6 @@ pub fn rerust(input: TokenStream) -> TokenStream {
     }
     let graph = visitor.reactive_graph();
     let code = generate(&graph).into();
-    println!("{}", code);
+    //println!("{}", code);
     code
 }
